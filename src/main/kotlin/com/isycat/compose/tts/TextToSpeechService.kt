@@ -69,7 +69,7 @@ open class TextToSpeechService(
 
     private suspend fun getCachedOrGenerateSpeech(text: String, voice: String, speed: Double): ByteArray? {
         val cacheKey = generateCacheKey(text, voice, speed)
-        val cacheFile = File(cacheDir, "$cacheKey.mp3")
+        val cacheFile = File(cacheDir, "$cacheKey.wav")
 
         if (cacheFile.exists()) {
             return cacheFile.readBytes()
@@ -94,13 +94,20 @@ open class TextToSpeechService(
             val inputStream = ByteArrayInputStream(audioData)
             val audioStream = AudioSystem.getAudioInputStream(inputStream)
             val format = audioStream.format
+
+            // Read all bytes from the stream to ensure we have the correct length
+            // and avoid "Audio data < 0" error in DirectClip.open(AudioInputStream)
+            val data = audioStream.readAllBytes()
+
             val info = DataLine.Info(Clip::class.java, format)
             val clip = AudioSystem.getLine(info) as Clip
-            clip.open(audioStream)
+            clip.open(format, data, 0, data.size)
             currentClip = clip
             clip.start()
         } catch (e: Exception) {
+            println("[TTS] Error playing audio: ${e.message}")
             e.printStackTrace()
+            throw e
         }
     }
 
