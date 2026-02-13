@@ -23,7 +23,7 @@ open class TextToSpeechService(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : AutoCloseable {
     private var currentClip: Clip? = null
-    private var preferredVoice: String = "alloy"
+    private var preferredVoice: String = "nova"
 
     init {
         cacheDir.mkdirs()
