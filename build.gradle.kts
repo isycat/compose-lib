@@ -3,10 +3,19 @@ plugins {
     id("org.jetbrains.compose") version "1.8.1"
     kotlin("plugin.compose") version "2.1.21"
     kotlin("plugin.serialization") version "2.1.21"
+    `maven-publish`
 }
 
-group = "com.isycat.compose"
-version = "1.0.0-SNAPSHOT"
+group = "com.github.isycat"
+version = "1.0.0"
+
+repositories {
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    mavenCentral()
+    google()
+    maven("https://maven.datlag.dev")
+    maven("https://jogamp.org/deployment/maven/")
+}
 
 dependencies {
     implementation(compose.desktop.currentOs)
@@ -30,11 +39,53 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-
 tasks.test {
     useJUnitPlatform()
 }
 
 kotlin {
     jvmToolchain(21)
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "com.github.isycat"
+            artifactId = "compose-lib"
+            version = project.version.toString()
+            
+            from(components["java"])
+            
+            pom {
+                name.set("Compose Lib")
+                description.set("Reusable Compose Desktop components and utilities")
+                url.set("https://github.com/isycat/compose-lib")
+                
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+                
+                developers {
+                    developer {
+                        id.set("isycat")
+                        name.set("isycat")
+                    }
+                }
+                
+                scm {
+                    connection.set("scm:git:git://github.com/isycat/compose-lib.git")
+                    developerConnection.set("scm:git:ssh://github.com/isycat/compose-lib.git")
+                    url.set("https://github.com/isycat/compose-lib")
+                }
+            }
+        }
+    }
 }
