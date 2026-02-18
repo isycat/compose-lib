@@ -1,12 +1,12 @@
 plugins {
-    kotlin("jvm") version "2.1.21"
-    id("org.jetbrains.compose") version "1.8.1"
-    kotlin("plugin.compose") version "2.1.21"
-    kotlin("plugin.serialization") version "2.1.21"
+    kotlin("jvm")
+    id("org.jetbrains.compose")
+    kotlin("plugin.compose")
+    kotlin("plugin.serialization")
     `maven-publish`
 }
 
-group = "com.github.isycat"
+group = "com.isycat.compose"
 version = "1.0.0"
 
 repositories {
@@ -57,7 +57,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "com.github.isycat"
             artifactId = "compose-lib"
-            version = project.version.toString()
+            version = "1.0.0"
             
             from(components["java"])
             
