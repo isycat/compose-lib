@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.isycat.compose"
-version = "v1.0.1"
+version = "v1.02"
 
 repositories {
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
@@ -57,7 +57,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "com.github.isycat"
             artifactId = "compose-lib"
-            version = "v1.0.1"
+            version = "v1.02"
             
             from(components["java"])
             

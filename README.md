@@ -24,7 +24,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.isycat:compose-lib:v1.0.1")
+    implementation("com.github.isycat:compose-lib:v1.0.2")
 }
 ```
 
@@ -46,7 +46,7 @@ dependencies {
     <dependency>
         <groupId>com.github.isycat</groupId>
         <artifactId>compose-lib</artifactId>
-        <version>v1.0.1</version>
+        <version>v1.02</version>
     </dependency>
 </dependencies>
 ```
