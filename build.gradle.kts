@@ -13,7 +13,7 @@ repositories {
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     mavenCentral()
     google()
-    maven("https://maven.datlag.dev")
+    // maven("https://maven.datlag.dev")
     maven("https://jogamp.org/deployment/maven/")
 }
 
