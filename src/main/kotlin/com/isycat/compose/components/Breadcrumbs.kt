@@ -30,7 +30,8 @@ fun <T> Breadcrumbs(
     rootText: String,
     onRootClick: () -> Unit,
     onItemClick: (T) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showRoot: Boolean = true
 ) {
     val breadcrumbsStyle = MaterialTheme.typography.bodyLarge.copy(letterSpacing = 0.15.em)
 
@@ -42,24 +43,28 @@ fun <T> Breadcrumbs(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = rootText.uppercase(),
-                style = breadcrumbsStyle,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .height(32.dp)
-                    .clickable { onRootClick() }
-                    .padding(vertical = 4.dp, horizontal = 8.dp)
-            )
-
-            items.forEach { item ->
-                Spacer(modifier = Modifier.width(8.dp))
+            if (showRoot) {
                 Text(
-                    text = ">",
+                    text = rootText.uppercase(),
                     style = breadcrumbsStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clickable { onRootClick() }
+                        .padding(vertical = 4.dp, horizontal = 8.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            items.forEachIndexed { index, item ->
+                if (showRoot || index > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = ">",
+                        style = breadcrumbsStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
