@@ -37,6 +37,9 @@ dependencies {
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 
     testImplementation(kotlin("test"))
+    // runComposeUiTest: drive real components (clicks, right-clicks, popups) in tests.
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
 }
 
 tasks.test {
