@@ -59,7 +59,8 @@ object ScrollHintDefaults {
 /**
  * A vertically scrolling column that shows when there's more to see: while content continues below, the bottom edge
  * fades into [fadeColor] under a down arrow, and likewise at the top once it's scrolled down. Clicking a faded edge
- * scrolls by [step]; the wheel and middle-click autoscroll work as usual, over the edges too.
+ * scrolls by [step]; the wheel and the middle button ([middleClick]) work as usual, over the edges too, and so do Page
+ * Up, Page Down, Home and End when the window has [ScrollKeys].
  *
  * [fadeColor] should be the colour behind the column, so the content looks like it runs out of view.
  */
@@ -71,11 +72,15 @@ fun ScrollHintColumn(
     step: Dp = ScrollHintDefaults.Step,
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    middleClick: MiddleClickScroll = MiddleClickScroll.AutoScroll,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Box(modifier) {
+    // A middle-drag is taken by the box, so it works over the faded edges as well; autoscroll stays on the column.
+    val drag = if (middleClick == MiddleClickScroll.Drag) Modifier.middleDragScroll(state) else Modifier
+    val autoScroll = if (middleClick == MiddleClickScroll.AutoScroll) Modifier.middleClickAutoScroll(state) else Modifier
+    Box(modifier.scrollKeys(state).then(drag)) {
         Column(
-            Modifier.matchParentSize().verticalScroll(state).middleClickAutoScroll(state),
+            Modifier.matchParentSize().verticalScroll(state).then(autoScroll),
             verticalArrangement = verticalArrangement,
             horizontalAlignment = horizontalAlignment,
             content = content
