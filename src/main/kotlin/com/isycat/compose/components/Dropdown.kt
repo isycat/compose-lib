@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
@@ -42,7 +43,7 @@ data class DropdownOption<T>(val value: T, val label: String)
  * opens a menu of options. Use for device/engine/enum pickers where a full-height text field is
  * too tall.
  *
- * [colors], [contentPadding] and [textStyle] restyle the button, e.g. to match the text fields beside it in a form
+ * [colors], [contentPadding], [textStyle] and [shape] restyle the button, e.g. to match the text fields beside it in a form
  * (the button's own label style when [textStyle] is null).
  */
 @Composable
@@ -55,7 +56,8 @@ fun <T> Dropdown(
     enabled: Boolean = true,
     colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
-    textStyle: TextStyle? = null
+    textStyle: TextStyle? = null,
+    shape: Shape = ButtonDefaults.outlinedShape
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = options.firstOrNull { it.value == selected }?.label ?: placeholder
@@ -66,6 +68,7 @@ fun <T> Dropdown(
             enabled = enabled,
             colors = colors,
             contentPadding = contentPadding,
+            shape = shape,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
