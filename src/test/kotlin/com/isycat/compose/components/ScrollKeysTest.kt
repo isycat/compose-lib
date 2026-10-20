@@ -72,6 +72,20 @@ class ScrollKeysTest {
     }
 
     @Test
+    fun scrollMovesTheAreaUnderThePointerForAnAppsOwnKeys() = runComposeUiTest {
+        showList()
+        assertEquals(false, keys.scroll(ScrollKeys.Move.END), "nothing to move until the pointer is over the list")
+
+        onNodeWithTag("list").performMouseInput { moveTo(center) }
+        assertTrue(keys.scroll(ScrollKeys.Move.END))
+        waitForIdle()
+        assertEquals(scroll.maxValue, scroll.value)
+        keys.scroll(ScrollKeys.Move.START)
+        waitForIdle()
+        assertEquals(0, scroll.value)
+    }
+
+    @Test
     fun aMiddleDragMovesTheContentWithThePointer() = runComposeUiTest {
         showList()
         onNodeWithTag("list").performMouseInput {

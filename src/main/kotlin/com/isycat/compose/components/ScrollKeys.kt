@@ -27,25 +27,41 @@ import kotlinx.coroutines.launch
  * Page Up, Page Down, Home and End for whichever scrolling area the pointer is over, as desktop apps behave. Make one
  * for the window and provide it with [LocalScrollKeys], mark each scrolling area with [scrollKeys], and hand the
  * window's key events to [onKeyEvent] after everything else has had them (`Window(onKeyEvent = …)`), so a focused text
- * field keeps Home and End for its cursor.
+ * field keeps Home and End for its cursor. An app whose keys can be rebound calls [scroll] from its own shortcuts
+ * instead.
  */
 class ScrollKeys {
     private var hovered: Hovered? = null
 
+    /** How a key moves a scrolling area. */
+    enum class Move { PAGE_UP, PAGE_DOWN, START, END }
+
     /** Scrolls the area under the pointer for a Page Up, Page Down, Home or End press. Returns whether it did. */
     fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed) return false
-        val area = hovered ?: return false
-        val target = area.target
-        val move: suspend () -> Unit =
+        val move =
             when (event.key) {
-                Key.PageDown -> ({ target.scrollBy(target.page()) })
-                Key.PageUp -> ({ target.scrollBy(-target.page()) })
-                Key.MoveHome -> target.toStart
-                Key.MoveEnd -> target.toEnd
+                Key.PageDown -> Move.PAGE_DOWN
+                Key.PageUp -> Move.PAGE_UP
+                Key.MoveHome -> Move.START
+                Key.MoveEnd -> Move.END
                 else -> return false
             }
-        area.scope.launch { move() }
+        return scroll(move)
+    }
+
+    /** Moves the area under the pointer by [move]. Returns whether there was one to move. */
+    fun scroll(move: Move): Boolean {
+        val area = hovered ?: return false
+        val target = area.target
+        area.scope.launch {
+            when (move) {
+                Move.PAGE_DOWN -> target.scrollBy(target.page())
+                Move.PAGE_UP -> target.scrollBy(-target.page())
+                Move.START -> target.toStart()
+                Move.END -> target.toEnd()
+            }
+        }
         return true
     }
 
