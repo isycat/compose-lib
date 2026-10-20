@@ -1,6 +1,7 @@
 package com.isycat.compose.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,17 @@ data class AppTabItem(
     val icon: (@Composable () -> Unit)? = null
 )
 
+/**
+ * A button among the tabs that isn't a tab: it looks just like one, but clicking it runs [onClick] instead of selecting
+ * anything. [anchored] is composed inside the button, so a menu it opens (a `DropdownMenu`) drops down from it.
+ */
+data class AppTabButton(
+    val title: String? = null,
+    val icon: (@Composable () -> Unit)? = null,
+    val anchored: (@Composable () -> Unit)? = null,
+    val onClick: () -> Unit
+)
+
 /** Where [AppLayout] puts its tabs. */
 enum class TabPlacement {
     /** A tab row across the top, under the top bar. */
@@ -61,6 +73,8 @@ fun AppLayout(
     tabContainerColor: Color? = null,
     /** Where the tabs go: across the top (the default) or down a side rail. */
     tabPlacement: TabPlacement = TabPlacement.Top,
+    /** Buttons that look like tabs but aren't tied to one, placed before the tabs. */
+    buttons: List<AppTabButton> = emptyList(),
     content: @Composable (Int) -> Unit
 ) {
     if (tabPlacement == TabPlacement.Side) {
@@ -70,29 +84,44 @@ fun AppLayout(
             bottomBar = { bottomBar?.invoke() }
         ) { innerPadding ->
             Row(Modifier.fillMaxSize().padding(innerPadding)) {
-                TabRail(tabs, selectedTabIndex, onTabSelected, accentColor, tabContainerColor)
+                TabRail(tabs, buttons, selectedTabIndex, onTabSelected, accentColor, tabContainerColor)
                 VerticalDivider()
                 Column(Modifier.fillMaxSize()) { content(selectedTabIndex) }
             }
         }
         return
     }
+    // The buttons come first in the row, so the selected tab's position in it is shifted past them.
+    val selectedPosition = selectedTabIndex + buttons.size
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             topBar?.invoke()
             if (accentColor != null) {
                 TabRow(
-                    selectedTabIndex = selectedTabIndex,
+                    selectedTabIndex = selectedPosition,
                     containerColor = tabContainerColor ?: MaterialTheme.colorScheme.surface,
-                    indicator = { positions -> GlowIndicator(positions, selectedTabIndex, accentColor) }
+                    indicator = { positions -> GlowIndicator(positions, selectedPosition, accentColor) }
                 ) {
+                    buttons.forEach { button ->
+                        TabButton(button) { AccentTab(AppTabItem(button.title, button.icon), false, accentColor, button.onClick) }
+                    }
                     tabs.forEachIndexed { index, item ->
                         AccentTab(item, index == selectedTabIndex, accentColor) { onTabSelected(index) }
                     }
                 }
             } else {
-                TabRow(selectedTabIndex = selectedTabIndex) {
+                TabRow(selectedTabIndex = selectedPosition) {
+                    buttons.forEach { button ->
+                        TabButton(button) {
+                            Tab(
+                                selected = false,
+                                onClick = button.onClick,
+                                text = button.title?.let { { Text(it) } },
+                                icon = button.icon
+                            )
+                        }
+                    }
                     tabs.forEachIndexed { index, item ->
                         Tab(
                             selected = selectedTabIndex == index,
@@ -120,12 +149,13 @@ private val RailWidth = 72.dp
 private val RailItemHeight = 64.dp
 
 /**
- * The tabs as a vertical rail: each one an icon over its title, the selected one in [accentColor] (glowing, with a
- * glowing bar on the rail's inner edge) or the primary colour when there's no accent.
+ * The tabs as a vertical rail, after any [buttons]: each one an icon over its title, the selected one in [accentColor]
+ * (glowing, with a glowing bar on the rail's inner edge) or the primary colour when there's no accent.
  */
 @Composable
 private fun TabRail(
     tabs: List<AppTabItem>,
+    buttons: List<AppTabButton>,
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     accentColor: Color?,
@@ -141,29 +171,67 @@ private fun TabRail(
             .selectableGroup(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        buttons.forEach { button ->
+            RailItem(
+                AppTabItem(button.title, button.icon),
+                Modifier.clickable(role = Role.Button, onClick = button.onClick),
+                selected = false,
+                accent = accent,
+                glow = false
+            ) { button.anchored?.invoke() }
+        }
         tabs.forEachIndexed { index, item ->
             val selected = index == selectedTabIndex
-            val color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(RailItemHeight)
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onTabSelected(index) }),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selected) RailIndicator(accent, glow = accentColor != null, Modifier.align(Alignment.CenterEnd))
-                CompositionLocalProvider(LocalContentColor provides color) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val glow = selected && accentColor != null
-                        item.icon?.let { icon -> if (glow) GlowWhenSelected(true) { icon() } else icon() }
-                        item.title?.let { title ->
-                            val text = @Composable { Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
-                            if (glow) GlowWhenSelected(true, text) else text()
-                        }
-                    }
+            RailItem(
+                item,
+                Modifier.selectable(selected = selected, role = Role.Tab, onClick = { onTabSelected(index) }),
+                selected = selected,
+                accent = accent,
+                glow = accentColor != null
+            )
+        }
+    }
+}
+
+/** One entry of the rail, tab or button: [item]'s icon over its title, marked as [selected] with the [accent]. */
+@Composable
+private fun RailItem(
+    item: AppTabItem,
+    interaction: Modifier,
+    selected: Boolean,
+    accent: Color,
+    glow: Boolean,
+    anchored: @Composable () -> Unit = {}
+) {
+    val color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(RailItemHeight)
+            .then(interaction),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) RailIndicator(accent, glow = glow, Modifier.align(Alignment.CenterEnd))
+        CompositionLocalProvider(LocalContentColor provides color) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val glowing = selected && glow
+                item.icon?.let { icon -> if (glowing) GlowWhenSelected(true) { icon() } else icon() }
+                item.title?.let { title ->
+                    val text = @Composable { Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                    if (glowing) GlowWhenSelected(true, text) else text()
                 }
             }
         }
+        anchored()
+    }
+}
+
+/** A button in a top tab row: the tab-looking [content], with the button's anchored content (its menu) beside it. */
+@Composable
+private fun TabButton(button: AppTabButton, content: @Composable () -> Unit) {
+    Box {
+        content()
+        button.anchored?.invoke()
     }
 }
 
