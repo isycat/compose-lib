@@ -1,6 +1,7 @@
 package com.isycat.compose.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,9 +11,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -27,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -36,6 +41,9 @@ data class DropdownOption<T>(val value: T, val label: String)
  * Compact single-select dropdown: a standard-height button showing the current selection that
  * opens a menu of options. Use for device/engine/enum pickers where a full-height text field is
  * too tall.
+ *
+ * [colors], [contentPadding] and [textStyle] restyle the button, e.g. to match the text fields beside it in a form
+ * (the button's own label style when [textStyle] is null).
  */
 @Composable
 fun <T> Dropdown(
@@ -44,14 +52,29 @@ fun <T> Dropdown(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Select",
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    textStyle: TextStyle? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = options.firstOrNull { it.value == selected }?.label ?: placeholder
 
     Box(modifier) {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-            Text(current, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        OutlinedButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            colors = colors,
+            contentPadding = contentPadding,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                current,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = textStyle ?: LocalTextStyle.current
+            )
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
