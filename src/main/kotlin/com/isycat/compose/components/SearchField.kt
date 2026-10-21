@@ -119,20 +119,20 @@ private fun SearchDecoration(
     val shape = RoundedCornerShape(8.dp)
     val accentFocused = glowColor != null && focused
     val borderColor = when {
-        accentFocused -> glowColor!!
+        accentFocused -> glowColor
         glowColor != null -> glowColor.copy(alpha = 0.40f)
         else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     }
     val borderWidth = if (accentFocused) 1.5.dp else 1.dp
     val background: Brush = if (accentFocused)
-        Brush.verticalGradient(listOf(glowColor!!.copy(alpha = 0.07f), glowColor.copy(alpha = 0.02f)))
+        Brush.verticalGradient(listOf(glowColor.copy(alpha = 0.07f), glowColor.copy(alpha = 0.02f)))
     else
         SolidColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-    val iconTint = if (accentFocused) glowColor!! else MaterialTheme.colorScheme.onSurfaceVariant
+    val iconTint = if (accentFocused) glowColor else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(Modifier.fillMaxSize()) {
         if (accentFocused) {
-            Box(Modifier.matchParentSize().blur(10.dp, BlurredEdgeTreatment.Unbounded).background(glowColor!!.copy(alpha = 0.13f), shape))
+            Box(Modifier.matchParentSize().blur(10.dp, BlurredEdgeTreatment.Unbounded).background(glowColor.copy(alpha = 0.13f), shape))
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

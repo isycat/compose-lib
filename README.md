@@ -87,9 +87,9 @@ This library includes various reusable components for Compose Desktop:
 ## Requirements
 
 - JDK 21+
-- Kotlin 2.1.21+
-- Gradle 8.5+
-- Jetbrains Compose 1.8.1+
+- Kotlin 2.4.21+
+- Gradle 8.14.3+
+- Jetbrains Compose 1.12.2+
 
 ## Dependencies
 

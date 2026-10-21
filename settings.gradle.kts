@@ -8,10 +8,10 @@ pluginManagement {
     }
     
     plugins {
-        kotlin("jvm") version "2.0.21"
-        id("org.jetbrains.compose") version "1.8.1"
-        kotlin("plugin.compose") version "2.0.21"
-        kotlin("plugin.serialization") version "2.0.21"
+        kotlin("jvm") version "2.4.21"
+        id("org.jetbrains.compose") version "1.12.2"
+        kotlin("plugin.compose") version "2.4.21"
+        kotlin("plugin.serialization") version "2.4.21"
     }
 }
 
