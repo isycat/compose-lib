@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,11 +34,19 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.isycat.compose.components.HoverTooltip
 
 data class AppTabItem(
     val title: String? = null,
-    val icon: (@Composable () -> Unit)? = null
-)
+    val icon: (@Composable () -> Unit)? = null,
+    /** Shown while the tab is hovered; it names a tab that's just an icon. */
+    val tooltip: (@Composable () -> Unit)? = null,
+    /** On a side rail, the tab sits at the bottom, apart from the others, as a settings tab often does. */
+    val atEnd: Boolean = false
+) {
+    /** A title and an icon, the icon as a trailing lambda: `AppTabItem("Sheet") { Icon(...) }`. */
+    constructor(title: String?, icon: (@Composable () -> Unit)?) : this(title, icon, null, false)
+}
 
 /**
  * A button among the tabs that isn't a tab: it looks just like one, but clicking it runs [onClick] instead of selecting
@@ -107,7 +116,7 @@ fun AppLayout(
                         TabButton(button) { AccentTab(AppTabItem(button.title, button.icon), false, accentColor, button.onClick) }
                     }
                     tabs.forEachIndexed { index, item ->
-                        AccentTab(item, index == selectedTabIndex, accentColor) { onTabSelected(index) }
+                        WithTooltip(item.tooltip) { AccentTab(item, index == selectedTabIndex, accentColor) { onTabSelected(index) } }
                     }
                 }
             } else {
@@ -123,12 +132,14 @@ fun AppLayout(
                         }
                     }
                     tabs.forEachIndexed { index, item ->
-                        Tab(
-                            selected = selectedTabIndex == index,
-                            onClick = { onTabSelected(index) },
-                            text = item.title?.let { { Text(it) } },
-                            icon = item.icon
-                        )
+                        WithTooltip(item.tooltip) {
+                            Tab(
+                                selected = selectedTabIndex == index,
+                                onClick = { onTabSelected(index) },
+                                text = item.title?.let { { Text(it) } },
+                                icon = item.icon
+                            )
+                        }
                     }
                 }
             }
@@ -150,7 +161,8 @@ private val RailItemHeight = 64.dp
 
 /**
  * The tabs as a vertical rail, after any [buttons]: each one an icon over its title, the selected one in [accentColor]
- * (glowing, with a glowing bar on the rail's inner edge) or the primary colour when there's no accent.
+ * (glowing, with a glowing bar on the rail's inner edge) or the primary colour when there's no accent. Tabs marked
+ * [AppTabItem.atEnd] sit at the bottom.
  */
 @Composable
 private fun TabRail(
@@ -180,17 +192,32 @@ private fun TabRail(
                 glow = false
             ) { button.anchored?.invoke() }
         }
-        tabs.forEachIndexed { index, item ->
+        @Composable
+        fun tab(index: Int, item: AppTabItem) {
             val selected = index == selectedTabIndex
-            RailItem(
-                item,
-                Modifier.selectable(selected = selected, role = Role.Tab, onClick = { onTabSelected(index) }),
-                selected = selected,
-                accent = accent,
-                glow = accentColor != null
-            )
+            WithTooltip(item.tooltip) {
+                RailItem(
+                    item,
+                    Modifier.selectable(selected = selected, role = Role.Tab, onClick = { onTabSelected(index) }),
+                    selected = selected,
+                    accent = accent,
+                    glow = accentColor != null
+                )
+            }
+        }
+        val (end, start) = tabs.withIndex().partition { it.value.atEnd }
+        start.forEach { (index, item) -> tab(index, item) }
+        if (end.isNotEmpty()) {
+            Spacer(Modifier.weight(1f))
+            end.forEach { (index, item) -> tab(index, item) }
         }
     }
+}
+
+/** [content] with [tooltip] shown while it's hovered, or just [content] when there's none. */
+@Composable
+private fun WithTooltip(tooltip: (@Composable () -> Unit)?, content: @Composable () -> Unit) {
+    if (tooltip == null) content() else HoverTooltip(tooltip) { content() }
 }
 
 /** One entry of the rail, tab or button: [item]'s icon over its title, marked as [selected] with the [accent]. */
