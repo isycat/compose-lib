@@ -54,7 +54,7 @@ fun <T> Dropdown(
     modifier: Modifier = Modifier,
     placeholder: String = "Select",
     enabled: Boolean = true,
-    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
+    colors: ButtonColors = ClassicButtonDefaults.outlinedButtonColors(),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     textStyle: TextStyle? = null,
     shape: Shape = ButtonDefaults.outlinedShape
@@ -67,6 +67,7 @@ fun <T> Dropdown(
             onClick = { expanded = true },
             enabled = enabled,
             colors = colors,
+            border = ClassicButtonDefaults.outlinedButtonBorder(enabled),
             contentPadding = contentPadding,
             shape = shape,
             modifier = Modifier.fillMaxWidth()
@@ -169,7 +170,13 @@ private fun <T> MultiSelectMenu(
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier) {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            colors = ClassicButtonDefaults.outlinedButtonColors(),
+            border = ClassicButtonDefaults.outlinedButtonBorder(enabled),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(summary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
