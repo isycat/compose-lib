@@ -16,15 +16,6 @@ import java.util.concurrent.Executors
 import javax.swing.JFileChooser
 import javax.swing.UIManager
 
-/** An entry in a file dialog's type list: what it's called ("Images") and the extensions it shows, without dots. */
-data class FileTypeFilter(val name: String, val extensions: List<String>) {
-    constructor(name: String, vararg extensions: String) : this(name, extensions.toList())
-
-    fun accepts(file: File): Boolean = extensions.any { file.extension.equals(it, ignoreCase = true) }
-
-    internal val pattern: String get() = extensions.joinToString(";") { "*.$it" }
-}
-
 /**
  * Open, save and folder pickers that look like the platform's own. On Windows they are the Explorer dialogs every
  * Windows app uses (`IFileOpenDialog` / `IFileSaveDialog`); elsewhere AWT's native dialog, or for folders on Linux,
