@@ -27,8 +27,8 @@ class WindowsFileDialogTest {
             dialog.options = dialog.options or WindowsFileDialog.FOS_OVERWRITEPROMPT or WindowsFileDialog.FOS_FORCEFILESYSTEM
             assertTrue(dialog.options and WindowsFileDialog.FOS_FORCEFILESYSTEM != 0)
 
-            dialog.fileName = "deck.chproj"
-            assertEquals("deck.chproj", dialog.fileName)
+            dialog.fileName = "deck.cshproj"
+            assertEquals("deck.cshproj", dialog.fileName)
 
             val folder = Files.createTempDirectory("dialog").toFile()
             dialog.setFolder(folder)
@@ -36,8 +36,8 @@ class WindowsFileDialogTest {
 
             dialog.setTitle("Save project as")
             dialog.setOkLabel("Save here")
-            dialog.setFileTypes(listOf("Card Render project" to "*.chproj"))
-            dialog.setDefaultExtension("chproj")
+            dialog.setFileTypes(listOf("Card Render project" to "*.cshproj"))
+            dialog.setDefaultExtension("cshproj")
         } finally {
             dialog.release()
         }
