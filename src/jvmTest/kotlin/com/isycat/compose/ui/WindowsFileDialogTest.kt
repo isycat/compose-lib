@@ -36,7 +36,7 @@ class WindowsFileDialogTest {
 
             dialog.setTitle("Save project as")
             dialog.setOkLabel("Save here")
-            dialog.setFileTypes(listOf("Card Render project" to "*.cshproj"))
+            dialog.setFileTypes(listOf("cardSTUDIO project" to "*.cshproj"))
             dialog.setDefaultExtension("cshproj")
         } finally {
             dialog.release()

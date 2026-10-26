@@ -16,7 +16,7 @@ import java.io.File
  */
 object WindowsFileAssociation {
     /**
-     * Files ending `.[extension]` are a [description] (e.g. "Card Render project"), opened by [executable] with the file
+     * Files ending `.[extension]` are a [description] (e.g. "cardSTUDIO project"), opened by [executable] with the file
      * as its only argument and shown with the icon at [iconIndex] in it. [progId] names the type in the registry, as
      * `Vendor.App.Type`.
      */
