@@ -7,7 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.MouseButton
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
@@ -77,6 +81,51 @@ class TabbedTitleBarTest {
         assertEquals(1, selected)
         assertEquals(behind, onNodeWithText("Bush.msplant").getUnclippedBoundsInRoot(), "neither tab changed width")
     }
+
+    /** Isabella, 2026-11-02: "middle click still doesnt close tabs???". */
+    @Test
+    fun aMiddleClickClosesATabWithoutSelectingIt() = runComposeUiTest {
+        var selected by mutableStateOf(0)
+        val closed = mutableListOf<String>()
+        val closable = tabs.map { tab -> TitleBarTab(tab.title, onClose = { closed += tab.title }) }
+        setContent { MaterialTheme { TabbedTitleBar(closable, selected, { selected = it }) } }
+
+        onNodeWithText("Bush.msplant").middleClick()
+        assertEquals(listOf("Bush.msplant"), closed)
+        assertEquals(0, selected)
+        // On the tab's own close button too, closing it once.
+        onNodeWithContentDescription("Close Tree.msplant").middleClick()
+        assertEquals(listOf("Bush.msplant", "Tree.msplant"), closed)
+        // Released off the tab, it closes nothing, as a click let go elsewhere doesn't click.
+        onNodeWithText("Bush.msplant").performMouseInput {
+            moveTo(center)
+            press(MouseButton.Tertiary)
+            moveTo(Offset(right + 100f, centerY))
+            release(MouseButton.Tertiary)
+        }
+        assertEquals(2, closed.size)
+        // A primary click still selects it.
+        onNodeWithText("Bush.msplant").performClick()
+        assertEquals(1, selected)
+        assertEquals(2, closed.size)
+    }
+
+    @Test
+    fun aMiddleClickOnATabThatCantCloseDoesNothing() = runComposeUiTest {
+        var selected by mutableStateOf(0)
+        setContent { MaterialTheme { TabbedTitleBar(tabs, selected, { selected = it }) } }
+
+        onNodeWithText("Bush.msplant").middleClick()
+        assertEquals(0, selected)
+        onNodeWithText("Bush.msplant").assertExists()
+    }
+
+    private fun SemanticsNodeInteraction.middleClick() =
+        performMouseInput {
+            moveTo(center)
+            press(MouseButton.Tertiary)
+            release(MouseButton.Tertiary)
+        }
 
     @Test
     fun anUnsavedTabWearsADot() = runComposeUiTest {

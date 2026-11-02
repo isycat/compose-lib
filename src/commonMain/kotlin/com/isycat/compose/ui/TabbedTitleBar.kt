@@ -38,9 +38,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -54,8 +56,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -77,7 +82,8 @@ import org.jetbrains.compose.resources.Font
  * One document's tab in a [TabbedTitleBar]: its [title], an [icon] before it (drawn about 14dp, in the tab's icon
  * colour as `LocalContentColor`) and a [tooltip], such as the file's path. An unsaved one ([dirty]) wears a dot at its
  * end until the pointer is on it. [onClose] gives it a close button there, shown while the tab is in front or the
- * pointer is on it; none when null. [key] keeps each tab's hover with it as tabs come and go.
+ * pointer is on it, and a middle-click closes it too; neither when null. [key] keeps each tab's hover with it as tabs
+ * come and go.
  */
 class TitleBarTab(
     val title: String,
@@ -401,6 +407,27 @@ private fun Modifier.movesWindow(window: TitleBarWindow): Modifier =
         }
     }
 
+/** A middle-click closes the tab, as browsers' and editors' tabs do: on the button's release, while still over it. */
+private fun Modifier.closesOnMiddleClick(onClose: () -> Unit): Modifier =
+    composed {
+        val close by rememberUpdatedState(onClose)
+        pointerInput(Unit) {
+            awaitEachGesture {
+                val press = awaitPointerEvent()
+                if (press.type != PointerEventType.Press || !press.buttons.isTertiaryPressed) return@awaitEachGesture
+                press.changes.forEach { it.consume() }
+                while (true) {
+                    val event = awaitPointerEvent()
+                    event.changes.forEach { it.consume() }
+                    if (!event.buttons.isTertiaryPressed) {
+                        if (event.changes.none { it.isOutOfBounds(size, extendedTouchPadding) }) close()
+                        return@awaitEachGesture
+                    }
+                }
+            }
+        }
+    }
+
 /** The bar's parts, sharing its colours, text and tooltips. */
 private class Bar(
     val colors: TitleBarColors,
@@ -484,6 +511,8 @@ private class Bar(
                     .background(if (selected) colors.selectedTab else if (hovered) colors.hover else Color.Transparent)
                     .hoverable(interaction)
                     .selectable(selected, interaction, indication = null, role = Role.Tab, onClick = onSelect)
+                    // Inside the selectable, so it takes a middle-click before the tab would.
+                    .then(tab.onClose?.let { Modifier.closesOnMiddleClick(it) } ?: Modifier)
                     .padding(start = 12.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
