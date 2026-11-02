@@ -84,13 +84,20 @@ fun FrameWindowScope.rememberTitleBarWindow(
     return remember(awtWindow, state) { AwtTitleBarWindow(awtWindow, state) { close() } }
 }
 
-/** Gives [window], and the panes under its content, [color]. */
+/**
+ * Gives [window], and the panes under its content, [color]. Compose's own pane is see-through, so until its first
+ * frame, and as it resizes, what showed through was AWT's white: opaque in [color], it shows that instead.
+ */
 private fun fill(window: Window, color: java.awt.Color) {
     window.background = color
     (window as? RootPaneContainer)?.let { panes ->
         panes.rootPane.background = color
         panes.layeredPane.background = color
         panes.contentPane.background = color
+        panes.contentPane.components.filterIsInstance<javax.swing.JLayeredPane>().forEach { pane ->
+            pane.isOpaque = true
+            pane.background = color
+        }
     }
 }
 
