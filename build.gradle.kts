@@ -41,6 +41,8 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
+            // Fonts bundled with the components, so they draw the same on every platform.
+            implementation(compose.components.resources)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
         }
         jvmMain.dependencies {
@@ -65,6 +67,11 @@ kotlin {
             implementation(compose.uiTest)
         }
     }
+}
+
+compose.resources {
+    packageOfResClass = "com.isycat.compose.resources"
+    publicResClass = false
 }
 
 tasks.named<Test>("jvmTest") {

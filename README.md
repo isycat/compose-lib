@@ -76,6 +76,40 @@ This library includes various reusable components for Compose Desktop:
 - Clipboard utilities
 - Window management helpers
 - Material 3 theme utilities
+- A tabbed title bar (`TabbedTitleBar`), as code editors draw theirs
+
+### Tabbed title bar
+
+`TabbedTitleBar` is a window's title bar with its documents as tabs: the app's icon and title, an optional menu behind
+a hamburger, a tab per document (an unsaved one wears a dot, and a tab can have a close button), then the app's own
+actions, an optional search box, undo and redo, and the window's buttons. The title can stay the app's or follow the
+tab in front (`titleFollowsTab`). Its look is calm neutral greys with small, centred text and thin line icons; only the
+tab in front takes the colour of the content below it (`TitleBarDefaults.colors()` and `typography()` change them).
+It draws in its own bundled font (Roboto, Apache 2.0), not the system's, so it looks the same on every platform.
+The window's buttons are compact by default, or spaced and drawn as Windows draws its own with
+`windowButtons = TitleBarWindowButtons.Windows`.
+
+On Windows it can stand in for the system's title bar: `rememberTitleBarWindow()` takes the window's caption off,
+keeping its frame (so it still resizes, snaps and casts its shadow), and the bar moves, maximises and resizes it.
+Elsewhere it returns null and the bar sits under the system's title bar, without the title or the window's buttons.
+
+```kotlin
+Window(onCloseRequest = ::exitApplication, state = windowState, title = "My app") {
+    val chrome = rememberTitleBarWindow(windowState, onCloseRequest = ::exitApplication)
+    Column {
+        TabbedTitleBar(
+            tabs = documents.map { TitleBarTab(it.name, dirty = it.unsaved, onClose = { close(it) }) },
+            selectedTabIndex = front,
+            onTabSelected = { front = it },
+            title = "My app",
+            window = chrome,
+            menu = { expanded, dismiss -> DropdownMenu(expanded, dismiss) { /* items */ } },
+            undoRedo = TitleBarUndoRedo(canUndo, canRedo, ::undo, ::redo),
+        )
+        // The window's content
+    }
+}
+```
 
 ## Building
 
