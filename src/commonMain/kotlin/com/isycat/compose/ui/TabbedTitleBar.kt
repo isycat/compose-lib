@@ -470,7 +470,7 @@ private class Bar(
     /**
      * A document's tab: the one in front in the colour of what lies below the bar, joined to it, with a mark in the
      * accent; the others lit under the pointer. Its end holds the unsaved dot or the close button, keeping its room
-     * either way, so tabs never shift as the pointer moves over them.
+     * either way, as every tab keeps the mark's, so tabs never shift as the pointer moves over them or one is picked.
      */
     @Composable
     fun DocumentTab(tab: TitleBarTab, selected: Boolean, onSelect: () -> Unit) {
@@ -487,10 +487,8 @@ private class Bar(
                     .padding(start = 12.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (selected) {
-                    Box(Modifier.width(2.dp).height(16.dp).background(colors.accent))
-                    Spacer(Modifier.width(7.dp))
-                }
+                Box(Modifier.width(2.dp).height(16.dp).background(if (selected) colors.accent else Color.Transparent))
+                Spacer(Modifier.width(7.dp))
                 tab.icon?.let { icon ->
                     Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
                         CompositionLocalProvider(LocalContentColor provides if (selected) colors.selectedTabContent else colors.tabIcon) { icon() }

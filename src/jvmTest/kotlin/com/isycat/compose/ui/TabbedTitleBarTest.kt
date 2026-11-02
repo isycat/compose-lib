@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -63,6 +64,18 @@ class TabbedTitleBarTest {
         assertEquals(1, selected)
         onNodeWithText("Tree.msplant").performClick()
         assertEquals(0, selected)
+    }
+
+    /** Isabella, 2026-11-02: "the tabs change size when clicked so they all shift". */
+    @Test
+    fun aTabKeepsItsPlaceAndWidthWhetherOrNotItsInFront() = runComposeUiTest {
+        var selected by mutableStateOf(0)
+        setContent { MaterialTheme { TabbedTitleBar(tabs, selected, { selected = it }) } }
+
+        val behind = onNodeWithText("Bush.msplant").getUnclippedBoundsInRoot()
+        onNodeWithText("Bush.msplant").performClick()
+        assertEquals(1, selected)
+        assertEquals(behind, onNodeWithText("Bush.msplant").getUnclippedBoundsInRoot(), "neither tab changed width")
     }
 
     @Test
