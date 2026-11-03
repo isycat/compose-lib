@@ -77,6 +77,10 @@ import com.isycat.compose.components.HoverTooltip
 import com.isycat.compose.resources.Res
 import com.isycat.compose.resources.roboto_regular
 import org.jetbrains.compose.resources.Font
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.DisposableEffect
 
 /**
  * One document's tab in a [TabbedTitleBar]: its [title], an [icon] before it (drawn about 14dp, in the tab's icon
@@ -135,8 +139,24 @@ interface TitleBarWindow {
     /** What the window's own close button would do: usually ask the app, which may ask to save first. */
     fun close()
 
-    /** Moves the window from the pointer, as a press on a system title bar does, snapping to the screen's edges. */
-    fun startMove()
+    /**
+     * Moves the window from the pointer, as a press on a system title bar does, snapping to the screen's edges. Only
+     * called when the window doesn't [handlesCaption].
+     */
+    fun startMove() = Unit
+
+    /**
+     * True when the system moves the window from the bar, maximises it on a double-click and shows its menu, as for its
+     * own caption. The bar then reports where it is ([captionAt]) and where its tabs and buttons are ([clickableAt]), and
+     * doesn't move the window itself.
+     */
+    val handlesCaption: Boolean get() = false
+
+    /** Where the bar is, in the window's pixels; null when it's gone. */
+    fun captionAt(area: Rect?) = Unit
+
+    /** Where one of the bar's tabs or buttons, [key], is in the window's pixels; null when it's gone. */
+    fun clickableAt(key: Any, area: Rect?) = Unit
 
     /**
      * Drawn over the bar's top, where the window's own frame has no edge left to resize it from: a strip that resizes
@@ -321,13 +341,19 @@ fun TabbedTitleBar(
     typography: TitleBarTypography = TitleBarDefaults.typography(),
     tooltip: @Composable (String) -> Unit = { TitleBarDefaults.Tooltip(it, colors, typography) },
 ) {
-    val bar = Bar(colors, typography, tooltip, tabTitleMaxWidth)
+    val bar = Bar(colors, typography, tooltip, tabTitleMaxWidth, window)
     Box(
         modifier
             .fillMaxWidth()
             .height(TitleBarDefaults.Height)
             .background(colors.bar)
-            .then(if (window != null) Modifier.movesWindow(window) else Modifier),
+            .then(
+                when {
+                    window == null -> Modifier
+                    window.handlesCaption -> Modifier.reportsCaption(window)
+                    else -> Modifier.movesWindow(window)
+                },
+            ),
     ) {
         Row(
             Modifier.fillMaxSize().padding(start = 4.dp, end = if (window != null) 0.dp else 8.dp),
@@ -363,7 +389,7 @@ fun TabbedTitleBar(
                 }
             }
             Spacer(Modifier.width(8.dp))
-            actions()
+            Row(bar.takesClicks(), verticalAlignment = Alignment.CenterVertically, content = actions)
             if (search != null) {
                 bar.SearchBox(search)
                 Spacer(Modifier.width(6.dp))
@@ -419,6 +445,21 @@ private fun Modifier.movesWindow(window: TitleBarWindow): Modifier =
         }
     }
 
+/** Reports the bar's area to [window], which moves the window from it. */
+private fun Modifier.reportsCaption(window: TitleBarWindow): Modifier =
+    composed {
+        DisposableEffect(window) { onDispose { window.captionAt(null) } }
+        onGloballyPositioned { window.captionAt(it.boundsInWindow()) }
+    }
+
+/** Reports this part's area to [window] as one that takes its own clicks, so the window isn't moved from it. */
+private fun Modifier.reportsClickable(window: TitleBarWindow): Modifier =
+    composed {
+        val key = remember { Any() }
+        DisposableEffect(window) { onDispose { window.clickableAt(key, null) } }
+        onGloballyPositioned { window.clickableAt(key, it.boundsInWindow()) }
+    }
+
 /** A middle-click closes the tab, as browsers' and editors' tabs do: on the button's release, while still over it. */
 private fun Modifier.closesOnMiddleClick(onClose: () -> Unit): Modifier =
     composed {
@@ -446,7 +487,11 @@ private class Bar(
     val typography: TitleBarTypography,
     val tooltip: @Composable (String) -> Unit,
     val tabTitleMaxWidth: Dp,
+    val window: TitleBarWindow?,
 ) {
+    /** Marks a part that takes its own clicks, for a window that moves from the rest of the bar. */
+    fun takesClicks(): Modifier = window?.takeIf { it.handlesCaption }?.let { Modifier.reportsClickable(it) } ?: Modifier
+
     /** [content], with [text] shown while it's hovered, or just [content] when there's none. */
     @Composable
     fun Tip(text: String?, content: @Composable () -> Unit) {
@@ -483,6 +528,7 @@ private class Bar(
         Tip(description) {
             Box(
                 modifier
+                    .then(takesClicks())
                     .size(size)
                     .clip(RoundedCornerShape(4.dp))
                     .background(background)
@@ -519,6 +565,7 @@ private class Bar(
         Tip(tab.tooltip) {
             Row(
                 Modifier
+                    .then(takesClicks())
                     .height(TitleBarDefaults.Height - 6.dp)
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                     .background(if (selected) colors.selectedTab else if (hovered) colors.hover else Color.Transparent)
@@ -568,6 +615,7 @@ private class Bar(
         Tip(search.tooltip) {
             Row(
                 Modifier
+                    .then(takesClicks())
                     .width(search.width)
                     .height(SEARCH_HEIGHT)
                     .clip(shape)
@@ -616,6 +664,7 @@ private class Bar(
         Tip(description) {
             Box(
                 Modifier
+                    .then(takesClicks())
                     .width(style.width)
                     .fillMaxHeight()
                     .background(if (hovered) hoverColor else Color.Transparent)

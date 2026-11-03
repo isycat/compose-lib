@@ -1,13 +1,5 @@
 package com.isycat.compose.ui
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -15,13 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
@@ -33,7 +22,6 @@ import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
 import com.sun.jna.win32.StdCallLibrary
 import com.sun.jna.win32.W32APIOptions
-import java.awt.Cursor
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -44,8 +32,9 @@ import javax.swing.RootPaneContainer
  * This window as a [TitleBarWindow], for a [TabbedTitleBar] that stands in for its title bar.
  *
  * On Windows the system's caption comes off and the bar takes its place. The window keeps its frame, so it still
- * resizes from its sides and bottom, snaps to the screen's edges and halves, and casts its shadow; the bar moves it,
- * maximises it on a double-click and resizes it from its top edge. Elsewhere, or with the `compose.nativeTitleBar`
+ * resizes from its sides and bottom, snaps to the screen's edges and halves, and casts its shadow. The system treats the
+ * bar's empty part as the caption, so it moves the window, maximises or restores it on a double-click and shows the
+ * window menu on a right-click; the bar's top edge resizes it. Elsewhere, or with the `compose.nativeTitleBar`
  * system property set, the window keeps its own title bar and this is null, so the bar sits under it as a tab bar.
  *
  * [onCloseRequest] is what the bar's close button does, as the window's own would. [background], when given, fills the
@@ -118,42 +107,52 @@ private class AwtTitleBarWindow(
 
     override fun close() = onClose()
 
-    override fun startMove() = CustomTitleBar.drag(window, CustomTitleBar.HTCAPTION)
+    override val handlesCaption: Boolean get() = true
 
-    /** Its top edge resizes the window, as the caption's did, but for when it fills the screen. */
-    @Composable
-    override fun TopResizeEdge() {
-        if (isMaximized) return
-        Row(Modifier.fillMaxWidth().height(RESIZE_EDGE)) {
-            Edge(CustomTitleBar.HTTOPLEFT, Cursor.NW_RESIZE_CURSOR, Modifier.width(RESIZE_CORNER).fillMaxHeight())
-            Edge(CustomTitleBar.HTTOP, Cursor.N_RESIZE_CURSOR, Modifier.weight(1f).fillMaxHeight())
-            Edge(CustomTitleBar.HTTOPRIGHT, Cursor.NE_RESIZE_CURSOR, Modifier.width(RESIZE_CORNER).fillMaxHeight())
-        }
-    }
+    override fun captionAt(area: Rect?) = CustomTitleBar.captionAt(window, area)
 
-    @Composable
-    private fun Edge(hit: Int, cursor: Int, modifier: Modifier) {
-        Box(
-            modifier.pointerHoverIcon(PointerIcon(Cursor(cursor))).pointerInput(hit) {
-                awaitEachGesture {
-                    awaitFirstDown().consume()
-                    CustomTitleBar.drag(window, hit)
-                }
-            },
-        )
-    }
+    override fun clickableAt(key: Any, area: Rect?) = CustomTitleBar.clickableAt(window, key, area)
 }
 
-private val RESIZE_EDGE = 4.dp
-private val RESIZE_CORNER = 8.dp
+/**
+ * What a point in a window with the bar as its caption is to the system, as WM_NCHITTEST answers: a resize edge along the
+ * top ([edge] deep, its corners [corner] wide) unless [maximized], the caption ([CustomTitleBar.HTCAPTION]) on the bar
+ * ([caption]) away from its tabs and buttons ([clickable]), or null for the window's own content. All in the client
+ * area's pixels, [width] wide.
+ */
+internal fun captionHit(
+    x: Float,
+    y: Float,
+    width: Float,
+    caption: Rect?,
+    clickable: Collection<Rect>,
+    maximized: Boolean,
+    edge: Float,
+    corner: Float,
+): Int? {
+    if (!maximized && y in 0f..<edge) {
+        return when {
+            x < corner -> CustomTitleBar.HTTOPLEFT
+            x >= width - corner -> CustomTitleBar.HTTOPRIGHT
+            else -> CustomTitleBar.HTTOP
+        }
+    }
+    val point = Offset(x, y)
+    if (caption == null || !caption.contains(point)) return null
+    return if (clickable.any { it.contains(point) }) null else CustomTitleBar.HTCAPTION
+}
+
+private const val RESIZE_EDGE_DP = 4f
+private const val RESIZE_CORNER_DP = 8f
 
 /**
- * Takes a window's caption off on Windows, leaving its frame, so its content runs to its top; then moves or resizes it
- * from there through the system's own move, as a press on the caption did. Windows only: the window's procedure is
- * wrapped, so the system measures the frame without the caption, and starts a move or resize when asked from the
- * window's own thread.
+ * Takes a window's caption off on Windows, leaving its frame, so its content runs to its top, and has the system treat
+ * the bar as the caption. Windows only: the window's procedure is wrapped, so the system measures the frame without the
+ * caption, and its hit test answers the caption on the bar's empty part and resize edges along its top. The system then
+ * moves, snaps, maximises and restores the window from there itself.
  */
 internal object CustomTitleBar {
+    const val HTCLIENT = 1
     const val HTCAPTION = 2
     const val HTTOP = 12
     const val HTTOPLEFT = 13
@@ -161,11 +160,8 @@ internal object CustomTitleBar {
 
     private const val GWLP_WNDPROC = -4
     private const val WM_NCCALCSIZE = 0x0083
-    private const val WM_NCLBUTTONDOWN = 0x00A1
-    private const val WM_APP = 0x8000
-
-    /** Asks the window's own thread to start the system's move or resize from a hit-test code, in its wParam. */
-    private const val DRAG = WM_APP + 0x31
+    private const val WM_NCHITTEST = 0x0084
+    private const val DEFAULT_DPI = 96f
 
     private const val SWP_NOSIZE = 0x0001
     private const val SWP_NOMOVE = 0x0002
@@ -180,7 +176,9 @@ internal object CustomTitleBar {
     private interface MoreUser32 : StdCallLibrary {
         fun IsZoomed(hwnd: WinDef.HWND): Boolean
 
-        fun ReleaseCapture(): Boolean
+        fun ScreenToClient(hwnd: WinDef.HWND, point: WinDef.POINT): Boolean
+
+        fun GetDpiForWindow(hwnd: WinDef.HWND): Int
     }
 
     private val user32: User32? by lazy { runCatching { User32.INSTANCE }.getOrNull() }
@@ -188,8 +186,16 @@ internal object CustomTitleBar {
         runCatching { Native.load("user32", MoreUser32::class.java, W32APIOptions.DEFAULT_OPTIONS) }.getOrNull()
     }
 
-    /** A window given a title bar of its own: its handle, the procedure it had, and the one put first. */
-    private class Installed(val hwnd: WinDef.HWND, val previous: Pointer, val procedure: WinUser.WindowProc)
+    /**
+     * A window given a title bar of its own: its handle, the procedure it had and the one put first, and where the bar
+     * and its tabs and buttons are, as the bar reports them from its thread for the window's procedure to read.
+     */
+    private class Installed(val hwnd: WinDef.HWND, val previous: Pointer) {
+        lateinit var procedure: WinUser.WindowProc
+
+        @Volatile var caption: Rect? = null
+        val clickable = ConcurrentHashMap<Any, Rect>()
+    }
 
     private val installed = ConcurrentHashMap<Window, Installed>()
 
@@ -209,17 +215,18 @@ internal object CustomTitleBar {
         if (more == null) return false
         val hwnd = Native.getWindowPointer(window)?.let(WinDef::HWND) ?: return false
         val previous = user32.GetWindowLongPtr(hwnd, GWLP_WNDPROC).toPointer() ?: return false
-        val procedure =
+        val wrapped = Installed(hwnd, previous)
+        wrapped.procedure =
             object : WinUser.WindowProc {
                 override fun callback(
                     hwnd: WinDef.HWND,
                     message: Int,
                     wParam: WinDef.WPARAM,
                     lParam: WinDef.LPARAM,
-                ): WinDef.LRESULT = windowProc(hwnd, message, wParam, lParam, previous)
+                ): WinDef.LRESULT = windowProc(hwnd, message, wParam, lParam, wrapped)
             }
-        installed[window] = Installed(hwnd, previous, procedure)
-        user32.SetWindowLongPtr(hwnd, GWLP_WNDPROC, CallbackReference.getFunctionPointer(procedure))
+        installed[window] = wrapped
+        user32.SetWindowLongPtr(hwnd, GWLP_WNDPROC, CallbackReference.getFunctionPointer(wrapped.procedure))
         // The frame measured again, without the caption.
         user32.SetWindowPos(hwnd, null, 0, 0, 0, 0, SWP_FRAMECHANGED or SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE)
         return true
@@ -231,10 +238,15 @@ internal object CustomTitleBar {
         runCatching { user32?.SetWindowLongPtr(wrapped.hwnd, GWLP_WNDPROC, wrapped.previous) }
     }
 
-    /** Starts the system's move of [window] from the pointer ([HTCAPTION]), or a resize from one of its top edges. */
-    fun drag(window: Window, hit: Int) {
-        val wrapped = installed[window] ?: return
-        runCatching { user32?.PostMessage(wrapped.hwnd, DRAG, WinDef.WPARAM(hit.toLong()), WinDef.LPARAM(0)) }
+    /** Where [window]'s bar is, in its client area's pixels; null when it's gone. */
+    fun captionAt(window: Window, area: Rect?) {
+        installed[window]?.caption = area
+    }
+
+    /** Where one of [window]'s bar's tabs or buttons, [key], is; null when it's gone. */
+    fun clickableAt(window: Window, key: Any, area: Rect?) {
+        val clickable = installed[window]?.clickable ?: return
+        if (area == null) clickable.remove(key) else clickable[key] = area
     }
 
     private fun windowProc(
@@ -242,9 +254,10 @@ internal object CustomTitleBar {
         message: Int,
         wParam: WinDef.WPARAM,
         lParam: WinDef.LPARAM,
-        previous: Pointer,
+        wrapped: Installed,
     ): WinDef.LRESULT {
         val user32 = user32!!
+        val previous = wrapped.previous
         when {
             message == WM_NCCALCSIZE && wParam.toLong() != 0L -> {
                 // The frame as the system measures it, but for the caption: the client area runs to the window's top,
@@ -257,19 +270,36 @@ internal object CustomTitleBar {
                 rect.setInt(4, top + if (more?.IsZoomed(hwnd) == true) frame else 0)
                 return result
             }
-            message == DRAG -> {
-                more?.ReleaseCapture()
-                user32.DefWindowProc(hwnd, WM_NCLBUTTONDOWN, wParam, WinDef.LPARAM(cursor(user32)))
-                return WinDef.LRESULT(0)
+            message == WM_NCHITTEST -> {
+                // The frame's own sides and bottom stay the system's; within the client area the bar decides.
+                val result = user32.CallWindowProc(previous, hwnd, message, wParam, lParam)
+                if (result.toInt() != HTCLIENT) return result
+                return WinDef.LRESULT((hit(hwnd, lParam, wrapped) ?: HTCLIENT).toLong())
             }
         }
         return user32.CallWindowProc(previous, hwnd, message, wParam, lParam)
     }
 
-    /** Where the pointer is on the screen, packed as a mouse message's lParam. */
-    private fun cursor(user32: User32): Long {
-        val point = WinDef.POINT()
-        user32.GetCursorPos(point)
-        return ((point.y.toLong() and LOW_WORD) shl WORD_BITS) or (point.x.toLong() and LOW_WORD)
+    /** What the point in a WM_NCHITTEST's [lParam] (screen pixels) is on [hwnd]'s bar, by [captionHit]. */
+    private fun hit(hwnd: WinDef.HWND, lParam: WinDef.LPARAM, wrapped: Installed): Int? {
+        val more = more ?: return null
+        val user32 = user32 ?: return null
+        val packed = lParam.toLong()
+        // Signed: on a screen left of or above the main one, the coordinates are negative.
+        val point = WinDef.POINT((packed and LOW_WORD).toInt().toShort().toInt(), ((packed shr WORD_BITS) and LOW_WORD).toInt().toShort().toInt())
+        if (!more.ScreenToClient(hwnd, point)) return null
+        val client = WinDef.RECT()
+        user32.GetClientRect(hwnd, client)
+        val scale = runCatching { more.GetDpiForWindow(hwnd) }.getOrDefault(0).takeIf { it > 0 }?.div(DEFAULT_DPI) ?: 1f
+        return captionHit(
+            point.x.toFloat(),
+            point.y.toFloat(),
+            (client.right - client.left).toFloat(),
+            wrapped.caption,
+            wrapped.clickable.values,
+            more.IsZoomed(hwnd),
+            RESIZE_EDGE_DP * scale,
+            RESIZE_CORNER_DP * scale,
+        )
     }
 }
