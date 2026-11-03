@@ -150,8 +150,14 @@ private const val RESIZE_CORNER_DP = 8f
  * the bar as the caption. Windows only: the window's procedure is wrapped, so the system measures the frame without the
  * caption, and its hit test answers the caption on the bar's empty part and resize edges along its top. The system then
  * moves, snaps, maximises and restores the window from there itself.
+ *
+ * Mouse input goes to the window under the pointer, which is a child of the frame (Skiko's canvas), not the frame. Each
+ * child's procedure is wrapped too: on the caption and the resize edges its hit test answers HTTRANSPARENT, so the
+ * system asks the frame beneath, which is on the same thread. Children are wrapped when the bar reports where it is, so
+ * a child created later is wrapped on the bar's next layout.
  */
 internal object CustomTitleBar {
+    const val HTTRANSPARENT = -1
     const val HTCLIENT = 1
     const val HTCAPTION = 2
     const val HTTOP = 12
@@ -179,6 +185,8 @@ internal object CustomTitleBar {
         fun ScreenToClient(hwnd: WinDef.HWND, point: WinDef.POINT): Boolean
 
         fun GetDpiForWindow(hwnd: WinDef.HWND): Int
+
+        fun EnumChildWindows(hwnd: WinDef.HWND, callback: WinUser.WNDENUMPROC, data: Pointer?): Boolean
     }
 
     private val user32: User32? by lazy { runCatching { User32.INSTANCE }.getOrNull() }
@@ -195,7 +203,13 @@ internal object CustomTitleBar {
 
         @Volatile var caption: Rect? = null
         val clickable = ConcurrentHashMap<Any, Rect>()
+
+        /** The frame's child windows whose procedures are wrapped, by handle, each with the procedure it had. */
+        val children = ConcurrentHashMap<Pointer, Child>()
     }
+
+    /** A child window's procedure as it was, and the one put first, kept here so it isn't collected. */
+    private class Child(val hwnd: WinDef.HWND, val previous: Pointer, val procedure: WinUser.WindowProc)
 
     private val installed = ConcurrentHashMap<Window, Installed>()
 
@@ -227,6 +241,7 @@ internal object CustomTitleBar {
             }
         installed[window] = wrapped
         user32.SetWindowLongPtr(hwnd, GWLP_WNDPROC, CallbackReference.getFunctionPointer(wrapped.procedure))
+        wrapChildren(wrapped)
         // The frame measured again, without the caption.
         user32.SetWindowPos(hwnd, null, 0, 0, 0, 0, SWP_FRAMECHANGED or SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE)
         return true
@@ -235,12 +250,50 @@ internal object CustomTitleBar {
     /** Gives [window] its system title bar back, as it closes. */
     fun remove(window: Window) {
         val wrapped = installed.remove(window) ?: return
-        runCatching { user32?.SetWindowLongPtr(wrapped.hwnd, GWLP_WNDPROC, wrapped.previous) }
+        runCatching {
+            wrapped.children.values.forEach { user32?.SetWindowLongPtr(it.hwnd, GWLP_WNDPROC, it.previous) }
+            user32?.SetWindowLongPtr(wrapped.hwnd, GWLP_WNDPROC, wrapped.previous)
+        }
     }
 
-    /** Where [window]'s bar is, in its client area's pixels; null when it's gone. */
+    /** Where [window]'s bar is, in its client area's pixels; null when it's gone. Wraps any child window not yet wrapped. */
     fun captionAt(window: Window, area: Rect?) {
-        installed[window]?.caption = area
+        val wrapped = installed[window] ?: return
+        wrapped.caption = area
+        if (area != null) runCatching { wrapChildren(wrapped) }
+    }
+
+    /** Wraps the procedure of each of the frame's child windows that isn't wrapped yet. */
+    private fun wrapChildren(wrapped: Installed) {
+        val user32 = user32 ?: return
+        val more = more ?: return
+        val found = mutableListOf<WinDef.HWND>()
+        val collect = WinUser.WNDENUMPROC { child, _ ->
+            found += child
+            true
+        }
+        more.EnumChildWindows(wrapped.hwnd, collect, null)
+        for (child in found) {
+            if (wrapped.children.containsKey(child.pointer)) continue
+            val previous = user32.GetWindowLongPtr(child, GWLP_WNDPROC).toPointer() ?: continue
+            val procedure =
+                object : WinUser.WindowProc {
+                    override fun callback(
+                        hwnd: WinDef.HWND,
+                        message: Int,
+                        wParam: WinDef.WPARAM,
+                        lParam: WinDef.LPARAM,
+                    ): WinDef.LRESULT {
+                        // On the caption and resize edges the frame beneath answers; elsewhere the child is as it was.
+                        if (message == WM_NCHITTEST && hit(wrapped.hwnd, lParam, wrapped) != null) {
+                            return WinDef.LRESULT(HTTRANSPARENT.toLong())
+                        }
+                        return user32.CallWindowProc(previous, hwnd, message, wParam, lParam)
+                    }
+                }
+            wrapped.children[child.pointer] = Child(child, previous, procedure)
+            user32.SetWindowLongPtr(child, GWLP_WNDPROC, CallbackReference.getFunctionPointer(procedure))
+        }
     }
 
     /** Where one of [window]'s bar's tabs or buttons, [key], is; null when it's gone. */
