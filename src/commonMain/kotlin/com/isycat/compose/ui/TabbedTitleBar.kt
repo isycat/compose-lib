@@ -82,6 +82,8 @@ import com.isycat.compose.resources.roboto_italic
 import com.isycat.compose.resources.roboto_medium
 import com.isycat.compose.resources.roboto_regular
 import org.jetbrains.compose.resources.Font
+import org.jetbrains.compose.resources.getFontResourceBytes
+import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -291,6 +293,9 @@ object TitleBarDefaults {
             Font(Res.font.roboto_bold, FontWeight.Bold),
             Font(Res.font.roboto_italic, FontWeight.Normal, FontStyle.Italic),
         )
+
+    /** The file of the bar's regular Roboto, for code that needs the font's bytes rather than a [FontFamily]. */
+    suspend fun fontBytes(): ByteArray = getFontResourceBytes(getSystemResourceEnvironment(), Res.font.roboto_regular)
 
     /** The bar's text, small: 11sp for the tabs, the title and the search box alike. */
     @Composable
