@@ -28,3 +28,11 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "compose-lib"
+
+// When another build includes this one, its outputs go to build/included-by/<including build's folder>-<path hash>/
+// so builds that run at the same time never write the same files.
+generateSequence(gradle) { it.parent }.last().takeIf { it !== gradle }?.startParameter?.let { start ->
+    val root = (start.projectDir ?: start.currentDir).canonicalFile
+    val folder = "build/included-by/${root.name}-${"%08x".format(root.path.hashCode())}"
+    gradle.beforeProject { layout.buildDirectory.set(layout.projectDirectory.dir(folder)) }
+}
