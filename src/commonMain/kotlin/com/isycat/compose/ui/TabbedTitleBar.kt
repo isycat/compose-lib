@@ -294,6 +294,9 @@ object TitleBarDefaults {
  *
  * [menu] draws the menu itself, anchored to the hamburger, given whether it's open and how to close it, so a
  * `DropdownMenu(expanded, onDismissRequest) { … }` fits it as it is.
+ *
+ * [onNewTab] puts a + after the tabs, as browsers have, named by [newTabDescription]. A tab's title is at most
+ * [tabTitleMaxWidth] wide, ending in an ellipsis past that; its tooltip can give the whole of it.
  */
 @Composable
 fun TabbedTitleBar(
@@ -310,12 +313,15 @@ fun TabbedTitleBar(
     menuDescription: String = "Menu",
     search: TitleBarSearch? = null,
     undoRedo: TitleBarUndoRedo? = null,
+    onNewTab: (() -> Unit)? = null,
+    newTabDescription: String = "New tab",
+    tabTitleMaxWidth: Dp = Dp.Infinity,
     actions: @Composable RowScope.() -> Unit = {},
     colors: TitleBarColors = TitleBarDefaults.colors(),
     typography: TitleBarTypography = TitleBarDefaults.typography(),
     tooltip: @Composable (String) -> Unit = { TitleBarDefaults.Tooltip(it, colors, typography) },
 ) {
-    val bar = Bar(colors, typography, tooltip)
+    val bar = Bar(colors, typography, tooltip, tabTitleMaxWidth)
     Box(
         modifier
             .fillMaxWidth()
@@ -350,6 +356,11 @@ fun TabbedTitleBar(
                 tabs.forEachIndexed { index, tab ->
                     key(tab.key) { bar.DocumentTab(tab, index == selectedTabIndex) { onTabSelected(index) } }
                 }
+                if (onNewTab != null) {
+                    Box(Modifier.fillMaxHeight().padding(start = 4.dp), contentAlignment = Alignment.Center) {
+                        bar.Button(TitleBarIcons.Plus, newTabDescription, Modifier.testTag(TitleBarTags.NEW_TAB), onClick = onNewTab)
+                    }
+                }
             }
             Spacer(Modifier.width(8.dp))
             actions()
@@ -376,6 +387,7 @@ object TitleBarTags {
     const val TITLE = "title-bar-title"
     const val MENU = "title-bar-menu"
     const val SEARCH = "title-bar-search"
+    const val NEW_TAB = "title-bar-new-tab"
 }
 
 /**
@@ -433,6 +445,7 @@ private class Bar(
     val colors: TitleBarColors,
     val typography: TitleBarTypography,
     val tooltip: @Composable (String) -> Unit,
+    val tabTitleMaxWidth: Dp,
 ) {
     /** [content], with [text] shown while it's hovered, or just [content] when there's none. */
     @Composable
@@ -524,7 +537,7 @@ private class Bar(
                     }
                     Spacer(Modifier.width(7.dp))
                 }
-                Label(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab)
+                Label(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab, Modifier.widthIn(max = tabTitleMaxWidth))
                 Spacer(Modifier.width(4.dp))
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                     val close = tab.onClose
@@ -646,6 +659,7 @@ private object TitleBarIcons {
     val Redo = icon("M15 14.5l5-5-5-5", "M20 9.5H9a5 5 0 0 0 0 10h3")
     val Search = icon("M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13", "M20.5 20.5l-5.4-5.4")
     val Close = icon("M6.5 6.5l11 11M17.5 6.5l-11 11")
+    val Plus = icon("M12 5.5v13", "M5.5 12h13")
     val Minimize = icon("M6 12.5h12")
     val Maximize = icon("M6.5 6.5h11v11h-11z")
     val Restore = icon("M6.5 9.5h8v8h-8z", "M9.5 9.5V6.5h8v8h-3")
