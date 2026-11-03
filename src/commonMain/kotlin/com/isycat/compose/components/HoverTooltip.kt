@@ -58,7 +58,12 @@ fun HoverTooltip(
 
     Box(
         modifier = modifier
-            .onPointerEvent(PointerEventType.Enter) { hovering = true }
+            // The pointer is taken from the enter too: it can come in with no move after it, and a tooltip placed from a
+            // stale position may cover it, which closes the tooltip.
+            .onPointerEvent(PointerEventType.Enter) {
+                pointer = it.changes.first().position
+                hovering = true
+            }
             .onPointerEvent(PointerEventType.Move) { pointer = it.changes.first().position }
             .onPointerEvent(PointerEventType.Exit) { hovering = false; show = false }
     ) {
