@@ -81,6 +81,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * One document's tab in a [TabbedTitleBar]: its [title], an [icon] before it (drawn about 14dp, in the tab's icon
@@ -315,7 +319,9 @@ object TitleBarDefaults {
  * [menu] draws the menu itself, anchored to the hamburger, given whether it's open and how to close it, so a
  * `DropdownMenu(expanded, onDismissRequest) { … }` fits it as it is.
  *
- * [onNewTab] puts a + after the tabs, as browsers have, named by [newTabDescription]. A tab's title is at most
+ * [onNewTab] puts a + after the tabs, as browsers have, named by [newTabDescription]. With [onMoveTab], a tab can be dragged
+ * along the row: it follows the pointer, and each time it passes half of a neighbour, [onMoveTab] is called with its index
+ * and the neighbour's, for the caller to swap them. A tab's title is at most
  * [tabTitleMaxWidth] wide, ending in an ellipsis past that; its tooltip can give the whole of it.
  */
 @Composable
@@ -334,6 +340,7 @@ fun TabbedTitleBar(
     search: TitleBarSearch? = null,
     undoRedo: TitleBarUndoRedo? = null,
     onNewTab: (() -> Unit)? = null,
+    onMoveTab: ((from: Int, to: Int) -> Unit)? = null,
     newTabDescription: String = "New tab",
     tabTitleMaxWidth: Dp = Dp.Infinity,
     actions: @Composable RowScope.() -> Unit = {},
@@ -379,8 +386,11 @@ fun TabbedTitleBar(
                 Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.Bottom,
             ) {
+                val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
                 tabs.forEachIndexed { index, tab ->
-                    key(tab.key) { bar.DocumentTab(tab, index == selectedTabIndex) { onTabSelected(index) } }
+                    key(tab.key) {
+                        bar.DocumentTab(tab, index == selectedTabIndex, drag?.modifier(tab.key) ?: Modifier) { onTabSelected(index) }
+                    }
                 }
                 if (onNewTab != null) {
                     Box(Modifier.fillMaxHeight().padding(start = 4.dp), contentAlignment = Alignment.Center) {
@@ -444,6 +454,75 @@ private fun Modifier.movesWindow(window: TitleBarWindow): Modifier =
             }
         }
     }
+
+/**
+ * Dragging tabs along the row: the tab being dragged ([dragged]) is drawn [offset] pixels from its place, above the
+ * others. Each time it passes half of a neighbour, [onMoveTab] swaps them and the offset is taken back by that width.
+ */
+private class TabDrag(
+    private val tabs: () -> List<TitleBarTab>,
+    private val onMoveTab: () -> ((Int, Int) -> Unit)?,
+    private val onSelect: () -> (Int) -> Unit,
+) {
+    var dragged by mutableStateOf<Any?>(null)
+    var offset by mutableStateOf(0f)
+    private val widths = mutableMapOf<Any, Int>()
+
+    fun modifier(key: Any): Modifier =
+        Modifier
+            .onSizeChanged { widths[key] = it.width }
+            .zIndex(if (dragged == key) 1f else 0f)
+            .graphicsLayer { translationX = if (dragged == key) offset else 0f }
+            .pointerInput(key) {
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        dragged = key
+                        offset = 0f
+                        tabs().indexOfFirst { it.key == key }.takeIf { it >= 0 }?.let { onSelect()(it) }
+                    },
+                    onDragEnd = { stop() },
+                    onDragCancel = { stop() },
+                ) { change, amount ->
+                    change.consume()
+                    offset += amount
+                    step(key)
+                }
+            }
+
+    private fun stop() {
+        dragged = null
+        offset = 0f
+    }
+
+    // Swaps the dragged tab with the neighbour it has passed half of, if any.
+    private fun step(key: Any) {
+        val list = tabs()
+        val at = list.indexOfFirst { it.key == key }
+        if (at < 0) return
+        val next = list.getOrNull(at + 1)?.let { widths[it.key] }
+        val previous = list.getOrNull(at - 1)?.let { widths[it.key] }
+        when {
+            next != null && offset > next / 2f -> {
+                onMoveTab()?.invoke(at, at + 1)
+                offset -= next
+            }
+            previous != null && offset < -previous / 2f -> {
+                onMoveTab()?.invoke(at, at - 1)
+                offset += previous
+            }
+        }
+    }
+}
+
+/** Dragging [tabs] along the row, when there's an [onMoveTab] to move them; null otherwise. */
+@Composable
+private fun rememberTabDrag(tabs: List<TitleBarTab>, onMoveTab: ((Int, Int) -> Unit)?, onSelect: (Int) -> Unit): TabDrag? {
+    val currentTabs by rememberUpdatedState(tabs)
+    val move by rememberUpdatedState(onMoveTab)
+    val select by rememberUpdatedState(onSelect)
+    val drag = remember { TabDrag({ currentTabs }, { move }, { select }) }
+    return drag.takeIf { onMoveTab != null }
+}
 
 /** Reports the bar's area to [window], which moves the window from it. */
 private fun Modifier.reportsCaption(window: TitleBarWindow): Modifier =
@@ -559,12 +638,12 @@ private class Bar(
      * either way, as every tab keeps the mark's, so tabs never shift as the pointer moves over them or one is picked.
      */
     @Composable
-    fun DocumentTab(tab: TitleBarTab, selected: Boolean, onSelect: () -> Unit) {
+    fun DocumentTab(tab: TitleBarTab, selected: Boolean, modifier: Modifier = Modifier, onSelect: () -> Unit) {
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
         Tip(tab.tooltip) {
             Row(
-                Modifier
+                modifier
                     .then(takesClicks())
                     .height(TitleBarDefaults.Height - 6.dp)
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
