@@ -69,12 +69,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isycat.compose.components.HoverTooltip
 import com.isycat.compose.resources.Res
+import com.isycat.compose.resources.roboto_bold
+import com.isycat.compose.resources.roboto_italic
+import com.isycat.compose.resources.roboto_medium
 import com.isycat.compose.resources.roboto_regular
 import org.jetbrains.compose.resources.Font
 import androidx.compose.ui.geometry.Rect
@@ -276,10 +281,16 @@ object TitleBarDefaults {
 
     /**
      * The bar's own font, Roboto, bundled with it rather than the system's, so the bar looks the same on every
-     * platform, the desktop's and the browser's alike.
+     * platform, the desktop's and the browser's alike: regular, medium, bold and italic (Roboto 2.135, Apache 2.0).
      */
     @Composable
-    fun fontFamily(): FontFamily = FontFamily(Font(Res.font.roboto_regular))
+    fun fontFamily(): FontFamily =
+        FontFamily(
+            Font(Res.font.roboto_regular, FontWeight.Normal),
+            Font(Res.font.roboto_medium, FontWeight.Medium),
+            Font(Res.font.roboto_bold, FontWeight.Bold),
+            Font(Res.font.roboto_italic, FontWeight.Normal, FontStyle.Italic),
+        )
 
     /** The bar's text, small: 11sp for the tabs, the title and the search box alike. */
     @Composable
