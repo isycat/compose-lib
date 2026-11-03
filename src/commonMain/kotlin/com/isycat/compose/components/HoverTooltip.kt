@@ -27,6 +27,8 @@ import kotlinx.coroutines.delay
  * A desktop hover tooltip that follows the cursor and adapts: it shows BELOW the cursor by default,
  * and flips ABOVE with a larger gap when there isn't room below (so it never sits under the cursor).
  *
+ * It closes when its content leaves the screen ([LocalOnScreen]).
+ *
  * Replaces `TooltipArea`'s placement, whose flipped-above case left too small a gap above the cursor.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -40,6 +42,14 @@ fun HoverTooltip(
     var hovering by remember { mutableStateOf(false) }
     var show by remember { mutableStateOf(false) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
+    // Content taken off screen gets no pointer exit, so its tooltip is closed here instead.
+    val onScreen = LocalOnScreen.current
+    LaunchedEffect(onScreen) {
+        if (!onScreen) {
+            hovering = false
+            show = false
+        }
+    }
 
     val density = LocalDensity.current
     val gapBelow = with(density) { 18.dp.roundToPx() }
@@ -61,7 +71,7 @@ fun HoverTooltip(
             }
         }
 
-        if (show) {
+        if (show && onScreen) {
             val provider = remember(pointer, gapBelow, gapAbove, margin) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
