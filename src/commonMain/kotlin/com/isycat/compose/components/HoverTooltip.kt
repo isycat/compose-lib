@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.LocalDensity
@@ -27,7 +28,9 @@ import kotlinx.coroutines.delay
  * A desktop hover tooltip that follows the cursor and adapts: it shows BELOW the cursor by default,
  * and flips ABOVE with a larger gap when there isn't room below (so it never sits under the cursor).
  *
- * It closes when its content leaves the screen ([LocalOnScreen]).
+ * It closes when its content leaves the screen ([LocalOnScreen]). A press on the content closes it, or stops it opening,
+ * until the pointer leaves and comes back, as native tooltips do: one left open after a click would take the next click
+ * below it.
  *
  * Replaces `TooltipArea`'s placement, whose flipped-above case left too small a gap above the cursor.
  */
@@ -41,6 +44,7 @@ fun HoverTooltip(
 ) {
     var hovering by remember { mutableStateOf(false) }
     var show by remember { mutableStateOf(false) }
+    var pressed by remember { mutableStateOf(false) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
     // Content taken off screen gets no pointer exit, so its tooltip is closed here instead.
     val onScreen = LocalOnScreen.current
@@ -65,14 +69,23 @@ fun HoverTooltip(
                 hovering = true
             }
             .onPointerEvent(PointerEventType.Move) { pointer = it.changes.first().position }
-            .onPointerEvent(PointerEventType.Exit) { hovering = false; show = false }
+            .onPointerEvent(PointerEventType.Exit) {
+                hovering = false
+                show = false
+                pressed = false
+            }
+            // Seen on the way down, before the content, and not consumed: the content's own click still works.
+            .onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) {
+                pressed = true
+                show = false
+            }
     ) {
         content()
 
-        LaunchedEffect(hovering) {
-            if (hovering) {
+        LaunchedEffect(hovering, pressed) {
+            if (hovering && !pressed) {
                 delay(delayMillis)
-                if (hovering) show = true
+                show = true
             }
         }
 
