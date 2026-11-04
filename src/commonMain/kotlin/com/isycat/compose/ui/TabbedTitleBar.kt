@@ -656,15 +656,16 @@ private class Bar(
     @Composable
     fun DocumentTab(tab: TitleBarTab, selected: Boolean, modifier: Modifier = Modifier, onSelect: () -> Unit) {
         val interaction = remember { MutableInteractionSource() }
-        val hovered by interaction.collectIsHoveredAsState()
+        var hovered by remember { mutableStateOf(false) }
         Tip(tab.tooltip) {
             Row(
-                modifier
+                // Before [modifier], so outside a drag's offset: measured against the tab's place, where it settles.
+                Modifier.tracksPointerOver { hovered = it }
+                    .then(modifier)
                     .then(takesClicks())
                     .height(TitleBarDefaults.Height - 6.dp)
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                     .background(if (selected) colors.selectedTab else if (hovered) colors.hover else Color.Transparent)
-                    .hoverable(interaction)
                     .selectable(selected, interaction, indication = null, role = Role.Tab, onClick = onSelect)
                     // Inside the selectable, so it takes a middle-click before the tab would.
                     .then(tab.onClose?.let { Modifier.closesOnMiddleClick(it) } ?: Modifier)
@@ -848,3 +849,18 @@ private val SEARCH_HEIGHT = 24.dp
 private val DOT_RAISE = 0.67.dp
 private const val RESTORE_FRONT = 0.8f
 private const val SELECTED_ALPHA = 0.22f
+
+/**
+ * Tells [onChange] whether the pointer is over this, from where each pointer event this gets puts it. Unlike an enter and
+ * an exit, that covers the release ending a drag that began here, which comes here wherever the pointer is by then: over
+ * something else in the window, or outside the window's content (over a title bar's caption, say), which sends no exit.
+ */
+private fun Modifier.tracksPointerOver(onChange: (Boolean) -> Unit): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                onChange(event.type != PointerEventType.Exit && event.changes.none { it.isOutOfBounds(size, Size.Zero) })
+            }
+        }
+    }
