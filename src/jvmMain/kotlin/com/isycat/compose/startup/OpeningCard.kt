@@ -74,12 +74,6 @@ class OpeningCard private constructor(
         }
     }
 
-    /** Shows [icon] beside the name, once it is made. */
-    fun icon(icon: Image) = SwingUtilities.invokeLater {
-        face.icon = icon
-        face.repaint()
-    }
-
     /** Puts the card away and keeps how long each step took for the next start's bar; once, however often it is called. */
     @Synchronized
     fun close() {
@@ -112,16 +106,17 @@ class OpeningCard private constructor(
 
     companion object {
         /**
-         * The card drawn by [art], going through [steps] in order, its bar measured by [timings] (see [OpeningCard]);
-         * shown now, on the first step, in the middle of the main screen.
+         * The card drawn by [art] with [icon], going through [steps] in order, its bar measured by [timings] (see
+         * [OpeningCard]); shown now, on the first step, in the middle of the main screen. An icon that is ready, as an
+         * image read from the app's resources, is there from the card's first frame.
          */
-        fun show(art: SplashArt, steps: List<String>, timings: Path?): OpeningCard {
+        fun show(art: SplashArt, icon: Image?, steps: List<String>, timings: Path?): OpeningCard {
             require(steps.isNotEmpty()) { "An opening card needs a step" }
             val expected = expected(steps, timings)
             var card: OpeningCard? = null
             SwingUtilities.invokeAndWait {
                 val window = JWindow()
-                val face = Face(art, steps.first())
+                val face = Face(art, steps.first()).also { it.icon = icon }
                 // Clear outside the round corners, which the face draws smooth.
                 window.background = Color(0, 0, 0, 0)
                 window.focusableWindowState = false
