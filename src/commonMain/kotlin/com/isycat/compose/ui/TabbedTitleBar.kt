@@ -74,6 +74,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextPainter
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.ImageBitmap
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.sp
 import com.isycat.compose.components.HoverTooltip
 import com.isycat.compose.resources.Res
@@ -385,13 +391,13 @@ fun TabbedTitleBar(
             if (window != null) {
                 Spacer(Modifier.width(6.dp))
                 if (appIcon != null) {
-                    Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(CENTRED_ICON), contentAlignment = Alignment.Center) {
                         CompositionLocalProvider(LocalContentColor provides colors.accent) { appIcon() }
                     }
                     Spacer(Modifier.width(8.dp))
                 }
                 val shown = TitleBarDefaults.title(title, tabs.getOrNull(selectedTabIndex), titleFollowsTab)
-                Label(shown, typography.small, colors.title, Modifier.widthIn(max = 320.dp).testTag(TitleBarTags.TITLE))
+                RowLabel(shown, typography.small, colors.title, Modifier.widthIn(max = 320.dp).testTag(TitleBarTags.TITLE))
                 Spacer(Modifier.width(6.dp))
             }
             if (menu != null) {
@@ -450,6 +456,51 @@ object TitleBarTags {
 private fun Label(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
     BasicText(text, modifier, style.copy(color = color), maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+/**
+ * One line of the bar's text in a row: it takes the row's height and stands with the middle of its capitals, as drawn,
+ * on the row's middle. Centring its line box instead set a name without descenders off the middle, since the box also
+ * holds the room below the baseline.
+ */
+@Composable
+private fun RowLabel(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    val capitals = rememberCapitalsMiddle(style)
+    BasicText(
+        text,
+        modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints.copy(minHeight = 0))
+            val height = if (constraints.hasBoundedHeight) constraints.maxHeight else placeable.height
+            val top = capitals?.let { (height / 2f - it).roundToInt() } ?: ((height - placeable.height) / 2)
+            layout(placeable.width, height) { placeable.place(0, top) }
+        },
+        style.copy(color = color),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/**
+ * The middle of [style]'s capitals as they are drawn, in pixels below the top of its line box: an "H" drawn once per
+ * style and density, its ink weighted by how much each pixel is covered. The layout's baseline cannot say this: the
+ * renderer snaps a line to whole pixels as its hinting decides, up at some sizes and down at others.
+ */
+@Composable
+private fun rememberCapitalsMiddle(style: TextStyle): Float? {
+    val measurer = rememberTextMeasurer()
+    return remember(measurer, style) {
+        val layout = measurer.measure("H", style.copy(color = Color.Black))
+        val (width, height) = layout.size.width to layout.size.height
+        if (width == 0 || height == 0) return@remember null
+        val bitmap = ImageBitmap(width, height)
+        TextPainter.paint(Canvas(bitmap), layout)
+        val pixels = IntArray(width * height).also { bitmap.readPixels(it) }
+        val alphas = pixels.map { (it ushr ALPHA_SHIFT) and 0xFF }
+        val total = alphas.sum()
+        if (total == 0) null else (alphas.withIndex().sumOf { (index, alpha) -> (index / width + 0.5) * alpha } / total).toFloat()
+    }
+}
+
+private const val ALPHA_SHIFT = 24
 
 /**
  * A press on the bar where nothing else takes it moves the window through the system's own move, which snaps to the
@@ -601,7 +652,7 @@ private class Bar(
         modifier: Modifier = Modifier,
         enabled: Boolean = true,
         selected: Boolean = false,
-        size: Dp = 26.dp,
+        size: Dp = BUTTON,
         iconSize: Dp = 16.dp,
         onClick: () -> Unit,
     ) {
@@ -643,7 +694,7 @@ private class Bar(
     fun MenuButton(menu: @Composable (Boolean, () -> Unit) -> Unit, description: String) {
         var open by remember { mutableStateOf(false) }
         Box {
-            Button(TitleBarIcons.Menu, description, Modifier.testTag(TitleBarTags.MENU), selected = open, size = 30.dp) { open = !open }
+            Button(TitleBarIcons.Menu, description, Modifier.testTag(TitleBarTags.MENU), selected = open, size = MENU_BUTTON) { open = !open }
             menu(open) { open = false }
         }
     }
@@ -680,7 +731,7 @@ private class Bar(
                     }
                     Spacer(Modifier.width(7.dp))
                 }
-                Label(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab, Modifier.widthIn(max = tabTitleMaxWidth))
+                RowLabel(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab, Modifier.widthIn(max = tabTitleMaxWidth))
                 Spacer(Modifier.width(4.dp))
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                     val close = tab.onClose
@@ -725,10 +776,10 @@ private class Bar(
             ) {
                 LineIcon(TitleBarIcons.Search, colors.fieldText, 12.dp)
                 Spacer(Modifier.width(6.dp))
-                Label(search.placeholder, typography.small, colors.fieldText, Modifier.weight(1f))
+                RowLabel(search.placeholder, typography.small, colors.fieldText, Modifier.weight(1f))
                 search.shortcut?.let { keys ->
                     Spacer(Modifier.width(8.dp))
-                    Label(keys, typography.small, colors.fieldText)
+                    RowLabel(keys, typography.small, colors.fieldText)
                 }
             }
         }
@@ -844,6 +895,12 @@ private fun HairlineGlyph(glyph: Glyph, color: Color) {
 }
 
 private val SEARCH_HEIGHT = 24.dp
+
+// What the bar centres measures a multiple of 8 dp, as the bar does: an even number of pixels at 100, 125, 150, 175 and
+// 200 %, so it sits on the bar's middle exactly rather than half a pixel off, or a pixel when one centres inside another.
+private val CENTRED_ICON = 16.dp
+private val BUTTON = 24.dp
+private val MENU_BUTTON = 32.dp
 
 /** How far the unsaved dot sits above the tab's middle, so it is level with the bar's font's capitals. */
 private val DOT_RAISE = 0.67.dp
