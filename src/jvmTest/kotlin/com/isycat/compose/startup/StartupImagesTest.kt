@@ -28,6 +28,24 @@ class StartupImagesTest {
     }
 
     @Test
+    fun theIconAndTheNameAreCentredTogetherWhateverTheNamesLength() {
+        val icon = BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB).apply { (0 until 8).forEach { x -> (0 until 8).forEach { y -> setRGB(x, y, 0xFF00FF00.toInt()) } } }
+        listOf(listOf(SplashWord("ditto", Color.White), SplashWord("CAD", Color.White)), listOf(SplashWord("a much longer app name than fits", Color.White)))
+            .forEach { words ->
+                val image = SplashArt(words, colors, cornerRadius = 12f).image(icon, "", 0f)
+                // Every column the icon or the name touches, anti-aliased edges included; the border and the clear round
+                // corners are left out.
+                val background = 0xFF1A1624.toInt()
+                val inside = 4 until SplashArt.WIDTH - 4
+                val columns = inside.filter { x -> (16 until SplashArt.HEIGHT - 64).any { y -> image.getRGB(x, y) != background } }
+                val (first, last) = columns.first() to columns.last()
+                // Centred by the glyphs' advances, as type is set, so the last letter's side bearing may show.
+                assertTrue(kotlin.math.abs(first - (SplashArt.WIDTH - 1 - last)) <= 4, "${words.joinToString("") { it.text }}: drawn from $first to $last of ${SplashArt.WIDTH}")
+                assertTrue(first >= 32 && last <= SplashArt.WIDTH - 32, "inside the margins: $first to $last")
+            }
+    }
+
+    @Test
     fun theBarIsFilledOnlyAsFarAsItsProgressSays() {
         val accent = 0xC9B1F1
         val bar = { progress: Float -> art.image(null, "Opening", progress).let { image -> (32 until SplashArt.WIDTH - 32).count { x -> (image.getRGB(x, SplashArt.HEIGHT - 22) and 0xFFFFFF) == accent } } }

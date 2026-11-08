@@ -17,7 +17,7 @@ class SplashColors(val background: Color, val border: Color, val track: Color, v
 
 /**
  * The face of an app's opening card ([OpeningCard]), laid out as cardSTUDIO's splash and moonshine's opening card: the
- * icon and the name, and along the foot the step it is on over a thin bar of how far it has come. Drawn with Java2D,
+ * icon and the name centred together, and along the foot the step it is on over a thin bar of how far it has come. Drawn with Java2D,
  * so it shows before Compose is made; text is the bundled Roboto, so it looks the same on every machine; the corners
  * are [cornerRadius] round and clear outside.
  */
@@ -31,11 +31,17 @@ class SplashArt(private val name: List<SplashWord>, private val colors: SplashCo
         g.color = colors.border.awt
         // Half a pixel in, so the line's whole width is inside the outline.
         g.draw(RoundRectangle2D.Float(HALF_PIXEL, HALF_PIXEL, WIDTH - 1f, HEIGHT - 1f, arc - 1, arc - 1))
+        // The icon and the name side by side, centred together; a name too long for the room is drawn smaller.
+        val room = WIDTH - 2 * MARGIN - ICON_SIZE - GAP
+        val full = AwtFonts.roboto(NAME_SIZE)
+        val wide = name.sumOf { g.getFontMetrics(full).stringWidth(it.text) }
+        g.font = if (wide <= room) full else full.deriveFont(NAME_SIZE * room / wide)
+        val nameWidth = name.sumOf { g.fontMetrics.stringWidth(it.text) }
+        val left = (WIDTH - ICON_SIZE - GAP - nameWidth) / 2
         val top = (HEIGHT - STATUS_HEIGHT - ICON_SIZE) / 2
-        icon?.let { g.drawImage(it, MARGIN, top, ICON_SIZE, ICON_SIZE, null) }
-        g.font = AwtFonts.roboto(NAME_SIZE)
+        icon?.let { g.drawImage(it, left, top, ICON_SIZE, ICON_SIZE, null) }
         val baseline = top + (ICON_SIZE + g.fontMetrics.ascent - g.fontMetrics.descent) / 2
-        name.fold(MARGIN + ICON_SIZE + GAP) { left, word ->
+        name.fold(left + ICON_SIZE + GAP) { left, word ->
             g.color = word.color.awt
             g.drawString(word.text, left, baseline)
             left + g.fontMetrics.stringWidth(word.text)
