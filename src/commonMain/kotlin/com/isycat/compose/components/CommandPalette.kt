@@ -51,6 +51,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 
@@ -248,18 +257,39 @@ fun CommandPalette(
                     }
                 }
                 HorizontalDivider(color = colors.outlineVariant)
-                val enter = "Enter ${state.choice?.verb ?: "runs"}"
-                val keys = "↑ ↓ choose · $enter · Esc closes"
                 Text(
-                    if (state.query.isBlank() && hint != null) "$hint · $keys" else keys,
+                    keysHint(state.choice?.verb ?: "runs", hint.takeIf { state.query.isBlank() }),
                     Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
+                    inlineContent = arrows(colors.onSurfaceVariant),
                 )
             }
         }
     }
 }
+
+/**
+ * What the keys do, said under the results, after [hint] when there is one: the arrows are drawn as icons, since the
+ * bundled Roboto has no arrow glyphs and a browser has no other font to borrow them from.
+ */
+internal fun keysHint(verb: String, hint: String?): AnnotatedString = buildAnnotatedString {
+    if (hint != null) append("$hint · ")
+    appendInlineContent(UP_ARROW, "Up")
+    append(" ")
+    appendInlineContent(DOWN_ARROW, "Down")
+    append(" choose · Enter $verb · Esc closes")
+}
+
+private fun arrows(tint: Color): Map<String, InlineTextContent> = mapOf(
+    UP_ARROW to Icons.Filled.ArrowUpward,
+    DOWN_ARROW to Icons.Filled.ArrowDownward,
+).mapValues { (_, icon) ->
+    InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) { Icon(icon, null, tint = tint) }
+}
+
+private const val UP_ARROW = "up"
+private const val DOWN_ARROW = "down"
 
 @Composable
 private fun PaletteRow(item: PaletteItem, query: String, chosen: Boolean, onPoint: () -> Unit, onClick: () -> Unit) {

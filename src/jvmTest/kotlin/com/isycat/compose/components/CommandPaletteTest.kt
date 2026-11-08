@@ -34,6 +34,16 @@ class CommandPaletteTest {
     }
 
     @Test
+    fun everyLetterThePaletteWritesItselfIsInTheBundledFont() {
+        // The browser has no fonts but the ones bundled: a glyph missing from Roboto draws as an empty box there.
+        val font = com.isycat.compose.ui.AwtFonts.roboto(12f)
+        val inline = '�'
+        val written = keysHint("runs", "Type to find more").text + "Nothing matches “x”"
+        val missing = written.filter { it != inline && !font.canDisplay(it) }.toSet()
+        assertTrue(missing.isEmpty(), "not in Roboto: ${missing.joinToString { "U+" + it.code.toString(16).uppercase() }}")
+    }
+
+    @Test
     fun theFieldHasTheFocusTypingFiltersArrowsChooseAndEnterRunsTheChoice() = runSkikoComposeUiTest {
         var open by mutableStateOf(true)
         setContent { MaterialTheme { if (open) CommandPalette(items, onDismiss = { open = false }) } }
