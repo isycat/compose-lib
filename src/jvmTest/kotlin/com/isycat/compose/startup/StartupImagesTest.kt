@@ -5,23 +5,50 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StartupImagesTest {
     private val colors = SplashColors(Color(0xFF1A1624), Color(0xFF3A3248), Color(0xFF282236), Color(0xFFC9B1F1), Color(0xFFADA2C6))
-    private val icon = BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB).apply { setRGB(4, 4, 0xFFFF0000.toInt()) }
+    private val art = SplashArt(listOf(SplashWord("ditto", Color.White), SplashWord("CAD", Color(0xFFC9B1F1))), colors, cornerRadius = 12f)
+
+    private fun opaque(image: BufferedImage) = (0 until image.height).flatMap { y -> (0 until image.width).map { x -> image.getRGB(x, y) and 0xFFFFFF } }.toSet()
 
     @Test
-    fun theSplashIsRoundCorneredOpaqueInsideAndShowsItsNameInEachWordsColour() {
-        val art = SplashArt(listOf(SplashWord("ditto", Color.White), SplashWord("CAD", Color(0xFFC9B1F1))), icon, colors, cornerRadius = 12f)
-        val image = art.image(Startup.FIRST_STEP)
+    fun theCardIsRoundCorneredOpaqueInsideAndShowsItsNameInEachWordsColour() {
+        val image = art.image(icon = null, status = "Opening", progress = 0f)
         assertEquals(SplashArt.WIDTH to SplashArt.HEIGHT, image.width to image.height)
-        assertEquals(0, image.getRGB(0, 0) ushr 24, "outside the round corner is transparent")
+        assertEquals(0, image.getRGB(0, 0) ushr 24, "outside the round corner is clear")
         assertEquals(0xFF, image.getRGB(SplashArt.WIDTH / 2, 20) ushr 24, "inside is opaque")
-        val pixels = (0 until image.height).flatMap { y -> (0 until image.width).map { x -> image.getRGB(x, y) and 0xFFFFFF } }.toSet()
-        assertTrue(0xFFFFFF in pixels && 0xC9B1F1 in pixels, "both words are drawn in their own colours")
+        assertTrue(0xFFFFFF in opaque(image), "the first word is drawn in its colour")
+    }
+
+    @Test
+    fun theBarIsFilledOnlyAsFarAsItsProgressSays() {
+        val accent = 0xC9B1F1
+        val bar = { progress: Float -> art.image(null, "Opening", progress).let { image -> (32 until SplashArt.WIDTH - 32).count { x -> (image.getRGB(x, SplashArt.HEIGHT - 22) and 0xFFFFFF) == accent } } }
+        assertEquals(0, bar(0f), "nothing measured, nothing filled")
+        assertTrue(bar(0.5f) in 200..216, "half the bar's 416 pixels: ${bar(0.5f)}")
+    }
+
+    @Test
+    fun aStartSharesTheBarByWhatEachStepTookLastTimeOrEvenlyWhenNotKnown() {
+        val file = Files.createTempFile("opening", ".timings")
+        try {
+            val steps = listOf("Reading", "Opening the window")
+            assertNull(OpeningCard.expected(steps, file), "an empty file names no step")
+            Files.writeString(file, "Reading\t300\nOpening the window\t100\n")
+            assertContentEquals(longArrayOf(300, 100), OpeningCard.expected(steps, file))
+            assertContentEquals(doubleArrayOf(0.75, 0.25), OpeningCard.shares(2, OpeningCard.expected(steps, file)))
+            assertContentEquals(doubleArrayOf(0.5, 0.5), OpeningCard.shares(2, null))
+            assertNull(OpeningCard.expected(steps + "Another", file), "timings that miss a step are not used")
+        } finally {
+            Files.deleteIfExists(file)
+        }
     }
 
     @Test

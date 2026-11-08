@@ -4,47 +4,33 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.isycat.compose.ui.AwtFonts
 import java.awt.Graphics2D
-import java.awt.Rectangle
+import java.awt.Image
 import java.awt.RenderingHints
-import java.awt.geom.Area
 import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
-import java.io.File
-import javax.imageio.ImageIO
 
-/** One word of an app's name on its splash, in its colour: cardSTUDIO is "card" in the text colour and "STUDIO" in the accent. */
+/** One word of an app's name on its card, in its colour: cardSTUDIO is "card" in the text colour and "STUDIO" in the accent. */
 class SplashWord(val text: String, val color: Color)
 
-/** A splash's colours, from the app's theme: a step above its background, its outline, track, accent and quiet text. */
+/** A card's colours, from the app's theme: a step above its background, its outline, track, accent and quiet text. */
 class SplashColors(val background: Color, val border: Color, val track: Color, val accent: Color, val muted: Color)
 
 /**
- * An app's splash screen, as cardSTUDIO's: its icon and name over a strip that says what is happening, with a bar that
- * fills as it goes. It is drawn with Java2D so it can be both written out as the image the JVM shows the moment it
- * starts (`-splash:`, before any of the app's code runs, see [write]) and drawn over at runtime ([Startup]). Text is
- * the bundled Roboto, so it looks the same whichever machine built it; the corners are [cornerRadius] round and
- * transparent outside.
+ * The face of an app's opening card ([OpeningCard]), laid out as cardSTUDIO's splash and moonshine's opening card: the
+ * icon and the name, and along the foot the step it is on over a thin bar of how far it has come. Drawn with Java2D,
+ * so it shows before Compose is made; text is the bundled Roboto, so it looks the same on every machine; the corners
+ * are [cornerRadius] round and clear outside.
  */
-class SplashArt(
-    private val name: List<SplashWord>,
-    private val icon: BufferedImage?,
-    private val colors: SplashColors,
-    private val cornerRadius: Float,
-) {
-    /** The strip along the bottom where what is happening is written, redrawn as it changes. */
-    val statusStrip = Rectangle(0, HEIGHT - STATUS_HEIGHT, WIDTH, STATUS_HEIGHT)
-
-    private val outline get() = RoundRectangle2D.Float(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), cornerRadius * 2, cornerRadius * 2)
-
-    /** The whole splash, saying [status], on a transparent [g] that is left untouched outside the round corners. */
-    fun paint(g: Graphics2D, status: String) {
+class SplashArt(private val name: List<SplashWord>, private val colors: SplashColors, private val cornerRadius: Float) {
+    /** The whole face on [g], with [icon] where it is made yet, saying [status], its bar [progress] (0 to 1) of the way. */
+    fun paint(g: Graphics2D, icon: Image?, status: String, progress: Float) {
         smooth(g)
+        val arc = cornerRadius * 2
         g.color = colors.background.awt
-        g.fill(outline)
+        g.fill(RoundRectangle2D.Float(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), arc, arc))
         g.color = colors.border.awt
         // Half a pixel in, so the line's whole width is inside the outline.
-        val arc = cornerRadius * 2 - 1
-        g.draw(RoundRectangle2D.Float(HALF_PIXEL, HALF_PIXEL, WIDTH - 1f, HEIGHT - 1f, arc, arc))
+        g.draw(RoundRectangle2D.Float(HALF_PIXEL, HALF_PIXEL, WIDTH - 1f, HEIGHT - 1f, arc - 1, arc - 1))
         val top = (HEIGHT - STATUS_HEIGHT - ICON_SIZE) / 2
         icon?.let { g.drawImage(it, MARGIN, top, ICON_SIZE, ICON_SIZE, null) }
         g.font = AwtFonts.roboto(NAME_SIZE)
@@ -54,46 +40,27 @@ class SplashArt(
             g.drawString(word.text, left, baseline)
             left + g.fontMetrics.stringWidth(word.text)
         }
-        paintStatus(g, status, progress = null)
-    }
-
-    /**
-     * Just the status strip: [status], and how far along it is when [progress] (0 to 1) is known. Its background stays
-     * inside the round corners and the border, so it never squares them off.
-     */
-    fun paintStatus(g: Graphics2D, status: String, progress: Float?) {
-        smooth(g)
-        val strip = statusStrip
-        g.color = colors.background.awt
-        val inside = Area(RoundRectangle2D.Float(1f, 1f, WIDTH - 2f, HEIGHT - 2f, cornerRadius * 2 - 2, cornerRadius * 2 - 2))
-        inside.intersect(Area(Rectangle(strip.x, strip.y, strip.width, strip.height)))
-        g.fill(inside)
+        val strip = HEIGHT - STATUS_HEIGHT
         g.font = AwtFonts.roboto(STATUS_SIZE)
         g.color = colors.muted.awt
-        g.drawString(status, MARGIN, strip.y + STATUS_BASELINE)
-        val bar = RoundRectangle2D.Float(MARGIN.toFloat(), (strip.y + BAR_TOP).toFloat(), (WIDTH - 2 * MARGIN).toFloat(), BAR_HEIGHT, BAR_HEIGHT, BAR_HEIGHT)
+        g.drawString(status, MARGIN, strip + STATUS_BASELINE)
+        val bar = RoundRectangle2D.Float(MARGIN.toFloat(), (strip + BAR_TOP).toFloat(), (WIDTH - 2 * MARGIN).toFloat(), BAR_HEIGHT, BAR_HEIGHT, BAR_HEIGHT)
         g.color = colors.track.awt
         g.fill(bar)
-        if (progress != null) {
+        if (progress > 0f) {
             g.color = colors.accent.awt
-            g.fill(RoundRectangle2D.Float(bar.x, bar.y, bar.width * progress.coerceIn(0f, 1f), bar.height, bar.height, bar.height))
+            g.fill(RoundRectangle2D.Float(bar.x, bar.y, maxOf(BAR_HEIGHT, bar.width * progress.coerceAtMost(1f)), bar.height, bar.height, bar.height))
         }
     }
 
-    /** The splash as an image, saying [status]. */
-    fun image(status: String): BufferedImage = BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB).also { image ->
+    /** The face as an image, as the card shows it, for checks. */
+    fun image(icon: Image?, status: String, progress: Float): BufferedImage = BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB).also { image ->
         val g = image.createGraphics()
         try {
-            paint(g, status)
+            paint(g, icon, status, progress)
         } finally {
             g.dispose()
         }
-    }
-
-    /** Writes the splash, saying [status], as the PNG the JVM shows with `-splash:` the moment it starts. */
-    fun write(file: File, status: String = Startup.FIRST_STEP) {
-        file.parentFile?.mkdirs()
-        check(ImageIO.write(image(status), "png", file)) { "No PNG writer" }
     }
 
     private fun smooth(g: Graphics2D) {
@@ -109,9 +76,11 @@ class SplashArt(
     companion object {
         const val WIDTH = 480
         const val HEIGHT = 260
+
+        /** How large the icon is drawn, in the card's pixels. */
+        const val ICON_SIZE = 96
         private const val MARGIN = 32
         private const val GAP = 20
-        private const val ICON_SIZE = 96
         private const val NAME_SIZE = 44f
         private const val STATUS_HEIGHT = 64
         private const val STATUS_SIZE = 14f
