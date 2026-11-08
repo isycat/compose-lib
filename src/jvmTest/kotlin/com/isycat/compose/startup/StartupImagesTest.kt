@@ -21,7 +21,7 @@ class StartupImagesTest {
     @Test
     fun theCardIsRoundCorneredOpaqueInsideAndShowsItsNameInEachWordsColour() {
         val image = art.image(icon = null, status = "Opening", progress = 0f)
-        assertEquals(SplashArt.WIDTH to SplashArt.HEIGHT, image.width to image.height)
+        assertEquals(SplashArt.WIDTH to SplashArt(emptyList(), colors, 12f).height, image.width to image.height)
         assertEquals(0, image.getRGB(0, 0) ushr 24, "outside the round corner is clear")
         assertEquals(0xFF, image.getRGB(SplashArt.WIDTH / 2, 20) ushr 24, "inside is opaque")
         assertTrue(0xFFFFFF in opaque(image), "the first word is drawn in its colour")
@@ -37,7 +37,7 @@ class StartupImagesTest {
                 // corners are left out.
                 val background = 0xFF1A1624.toInt()
                 val inside = 4 until SplashArt.WIDTH - 4
-                val columns = inside.filter { x -> (16 until SplashArt.HEIGHT - 64).any { y -> image.getRGB(x, y) != background } }
+                val columns = inside.filter { x -> (16 until SplashArt(emptyList(), colors, 12f).height - 64).any { y -> image.getRGB(x, y) != background } }
                 val (first, last) = columns.first() to columns.last()
                 // Centred by the glyphs' advances, as type is set, so the last letter's side bearing may show.
                 assertTrue(kotlin.math.abs(first - (SplashArt.WIDTH - 1 - last)) <= 4, "${words.joinToString("") { it.text }}: drawn from $first to $last of ${SplashArt.WIDTH}")
@@ -46,9 +46,46 @@ class StartupImagesTest {
     }
 
     @Test
+    fun aScreenBlendIsNeverDarkerThanEitherLayerAndLeavesWhiteWhite() {
+        val under = listOf(0xFF1A1624.toInt(), 0xFFFFFFFF.toInt(), 0xFF808080.toInt())
+        val icon = 0xFFBDB2F1.toInt()
+        under.forEach { u ->
+            val out = SplashArt.screen(u, icon)
+            listOf(16, 8, 0).forEach { shift ->
+                val (b, s, o) = Triple((u ushr shift) and 0xFF, (icon ushr shift) and 0xFF, (out ushr shift) and 0xFF)
+                assertTrue(o >= maxOf(b, s) - 1, "channel $shift: $o from $b and $s")
+            }
+        }
+        assertEquals(0xFFFFFFFF.toInt(), SplashArt.screen(0xFFFFFFFF.toInt(), icon), "white stays white")
+        assertEquals(0xFF1A1624.toInt(), SplashArt.screen(0xFF1A1624.toInt(), 0x00BDB2F1), "a clear icon pixel changes nothing")
+    }
+
+    @Test
+    fun theIconOverTheNamesEndIsBlendedOntoItAndTheTwoAreCentred() {
+        val over = SplashArt(listOf(SplashWord("dittoCAD", Color.White)), colors, 12f, SplashLayout.OverNameEnd(across = -0.54f, up = 0.72f))
+        assertEquals(480 to 175, over.width to over.height)
+        val icon = BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB).apply { (0 until 8).forEach { x -> (0 until 8).forEach { y -> setRGB(x, y, 0xFF404040.toInt()) } } }
+        val plain = over.image(null, "", 0f)
+        val blended = over.image(icon, "", 0f)
+        val changed = (0 until over.width).flatMap { x -> (0 until over.height).map { y -> x to y } }.filter { (x, y) -> plain.getRGB(x, y) != blended.getRGB(x, y) }
+        assertTrue(changed.isNotEmpty(), "the icon is drawn")
+        changed.forEach { (x, y) ->
+            val (b, o) = plain.getRGB(x, y) to blended.getRGB(x, y)
+            assertTrue(listOf(16, 8, 0).all { ((o ushr it) and 0xFF) >= ((b ushr it) and 0xFF) }, "screen only lightens, at $x, $y")
+        }
+        val white = (0 until over.width).flatMap { x -> (0 until over.height).map { y -> x to y } }.filter { (x, y) -> plain.getRGB(x, y) == 0xFFFFFFFF.toInt() }
+        assertTrue(white.isNotEmpty(), "the name is drawn")
+        val iconLeft = changed.minOf { it.first }
+        val textLeft = white.minOf { it.first }
+        val right = maxOf(changed.maxOf { it.first }, white.maxOf { it.first })
+        assertTrue(iconLeft < white.maxOf { it.first }, "the icon starts over the name")
+        assertTrue(kotlin.math.abs(textLeft - (over.width - 1 - right)) <= 4, "centred together: $textLeft to $right")
+    }
+
+    @Test
     fun theBarIsFilledOnlyAsFarAsItsProgressSays() {
         val accent = 0xC9B1F1
-        val bar = { progress: Float -> art.image(null, "Opening", progress).let { image -> (32 until SplashArt.WIDTH - 32).count { x -> (image.getRGB(x, SplashArt.HEIGHT - 22) and 0xFFFFFF) == accent } } }
+        val bar = { progress: Float -> art.image(null, "Opening", progress).let { image -> (32 until SplashArt.WIDTH - 32).count { x -> (image.getRGB(x, SplashArt(emptyList(), colors, 12f).height - 22) and 0xFFFFFF) == accent } } }
         assertEquals(0, bar(0f), "nothing measured, nothing filled")
         assertTrue(bar(0.5f) in 200..216, "half the bar's 416 pixels: ${bar(0.5f)}")
     }

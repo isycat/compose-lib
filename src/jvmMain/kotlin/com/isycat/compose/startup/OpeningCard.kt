@@ -126,7 +126,7 @@ class OpeningCard private constructor(
                 window.background = Color(0, 0, 0, 0)
                 window.focusableWindowState = false
                 window.contentPane = face
-                window.size = Dimension(SplashArt.WIDTH, SplashArt.HEIGHT)
+                window.size = Dimension(art.width, art.height)
                 window.setLocationRelativeTo(null)
                 window.isVisible = true
                 card = OpeningCard(window, face, steps, timings, expected).also { it.ticks.start() }
