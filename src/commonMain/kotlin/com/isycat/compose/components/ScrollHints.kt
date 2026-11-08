@@ -5,6 +5,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableState
@@ -31,13 +33,16 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -45,6 +50,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -112,9 +118,11 @@ fun BoxScope.ScrollHints(
         if (cap > 0f) minOf(step.toPx(), cap) else step.toPx()
     }
     Spacer(Modifier.matchParentSize().onSizeChanged { viewport = it.height })
+    // Until the viewport has been measured, what can be scrolled is not known yet: an edge shown then would flash.
+    val measured = viewport > 0
     if (showTop) {
         ScrollHintEdge(
-            visible = state.canScrollBackward,
+            visible = measured && state.canScrollBackward,
             down = false,
             state = state,
             fadeColor = fadeColor,
@@ -122,7 +130,7 @@ fun BoxScope.ScrollHints(
         ) { scope.launch { state.animateScrollBy(-stepPx) } }
     }
     ScrollHintEdge(
-        visible = state.canScrollForward,
+        visible = measured && state.canScrollForward,
         down = true,
         state = state,
         fadeColor = fadeColor,
@@ -164,4 +172,22 @@ private fun ScrollHintEdge(
             )
         }
     }
+}
+
+/**
+ * Brings this content into view whenever [key] changes, as content that has just appeared asks to be seen, and clear
+ * of the faded edges [ScrollHints] draws over the ends of the viewport, so nothing in it lies under an edge, where a
+ * click scrolls instead.
+ */
+@Composable
+fun Modifier.bringIntoViewClearOfHints(key: Any?): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val margin = with(LocalDensity.current) { ScrollHintDefaults.FadeHeight.toPx() }
+    LaunchedEffect(key, size) {
+        if (size != IntSize.Zero) {
+            requester.bringIntoView(Rect(0f, -margin, size.width.toFloat(), size.height + margin))
+        }
+    }
+    return bringIntoViewRequester(requester).onSizeChanged { size = it }
 }
