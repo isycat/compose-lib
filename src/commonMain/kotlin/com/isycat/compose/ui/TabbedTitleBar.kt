@@ -29,6 +29,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -129,7 +130,11 @@ class TitleBarSearch(
     val width: Dp = 250.dp,
 )
 
-/** The undo and redo buttons of a [TabbedTitleBar]; their tooltips can name the step and the key, "Undo (Ctrl+Z)". */
+/**
+ * The undo and redo buttons of a [TabbedTitleBar]; their tooltips can name the step and the key, "Undo Set width to 20
+ * (Ctrl+Z)". Where there are [undoSteps] or [redoSteps], the next first, a narrow button beside each lists them, and
+ * picking one goes back or forward through every step down to it, as [onUndoSteps] and [onRedoSteps] do with the count.
+ */
 class TitleBarUndoRedo(
     val canUndo: Boolean,
     val canRedo: Boolean,
@@ -137,6 +142,13 @@ class TitleBarUndoRedo(
     val onRedo: () -> Unit,
     val undoTooltip: String = "Undo",
     val redoTooltip: String = "Redo",
+    val undoSteps: List<String> = emptyList(),
+    val redoSteps: List<String> = emptyList(),
+    val onUndoSteps: (Int) -> Unit = { count -> repeat(count) { onUndo() } },
+    val onRedoSteps: (Int) -> Unit = { count -> repeat(count) { onRedo() } },
+    /** The tooltips of the narrow buttons that list the steps. */
+    val undoStepsTooltip: String = "Steps to undo",
+    val redoStepsTooltip: String = "Steps to redo",
 )
 
 /**
@@ -428,7 +440,9 @@ fun TabbedTitleBar(
             }
             if (undoRedo != null) {
                 bar.Button(TitleBarIcons.Undo, undoRedo.undoTooltip, enabled = undoRedo.canUndo, onClick = undoRedo.onUndo)
+                bar.Steps(undoRedo.undoSteps, undoRedo.undoStepsTooltip, TitleBarTags.UNDO_STEPS, undoRedo.onUndoSteps)
                 bar.Button(TitleBarIcons.Redo, undoRedo.redoTooltip, enabled = undoRedo.canRedo, onClick = undoRedo.onRedo)
+                bar.Steps(undoRedo.redoSteps, undoRedo.redoStepsTooltip, TitleBarTags.REDO_STEPS, undoRedo.onRedoSteps)
             }
             if (window != null) {
                 Spacer(Modifier.width(8.dp))
@@ -446,6 +460,10 @@ object TitleBarTags {
     const val MENU = "title-bar-menu"
     const val SEARCH = "title-bar-search"
     const val NEW_TAB = "title-bar-new-tab"
+
+    /** The narrow buttons that list the steps to undo and to redo; each step in a list is tagged with its place, ":0" first. */
+    const val UNDO_STEPS = "title-bar-undo-steps"
+    const val REDO_STEPS = "title-bar-redo-steps"
 }
 
 /**
@@ -654,6 +672,7 @@ private class Bar(
         selected: Boolean = false,
         size: Dp = BUTTON,
         iconSize: Dp = 16.dp,
+        width: Dp = size,
         onClick: () -> Unit,
     ) {
         val interaction = remember { MutableInteractionSource() }
@@ -675,7 +694,7 @@ private class Bar(
             Box(
                 modifier
                     .then(takesClicks())
-                    .size(size)
+                    .size(width, size)
                     .clip(RoundedCornerShape(4.dp))
                     .background(background)
                     .hoverable(interaction)
@@ -690,6 +709,41 @@ private class Bar(
     }
 
     /** The hamburger, opening [menu] under it. */
+    /**
+     * A narrow button, where there are [steps], that lists them under it, the next first; the pointer over one lights it
+     * and every one before it, and picking it hands [onSteps] how many that is.
+     */
+    @Composable
+    fun Steps(steps: List<String>, description: String, tag: String, onSteps: (Int) -> Unit) {
+        if (steps.isEmpty()) return
+        var open by remember { mutableStateOf(false) }
+        var lit by remember(open) { mutableStateOf(-1) }
+        Box {
+            Button(TitleBarIcons.Down, description, Modifier.testTag(tag), selected = open, iconSize = 10.dp, width = STEPS_WIDTH) {
+                open = !open
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bar) {
+                steps.forEachIndexed { index, step ->
+                    Label(
+                        step,
+                        typography.small,
+                        colors.title,
+                        Modifier
+                            .widthIn(min = STEPS_MENU_WIDTH, max = STEPS_MENU_WIDTH * 2)
+                            .tracksPointerOver { over -> if (over) lit = index else if (lit == index) lit = -1 }
+                            .background(if (index <= lit) colors.hover else Color.Transparent)
+                            .clickable {
+                                open = false
+                                onSteps(index + 1)
+                            }
+                            .testTag("$tag:$index")
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+    }
+
     @Composable
     fun MenuButton(menu: @Composable (Boolean, () -> Unit) -> Unit, description: String) {
         var open by remember { mutableStateOf(false) }
@@ -853,6 +907,7 @@ private object TitleBarIcons {
     val Menu = icon("M4 7h16", "M4 12h16", "M4 17h16")
     val Undo = icon("M9 14.5L4 9.5l5-5", "M4 9.5h11a5 5 0 0 1 0 10h-3")
     val Redo = icon("M15 14.5l5-5-5-5", "M20 9.5H9a5 5 0 0 0 0 10h3")
+    val Down = icon("M6 9.5l6 6 6-6")
     val Search = icon("M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13", "M20.5 20.5l-5.4-5.4")
     val Close = icon("M6.5 6.5l11 11M17.5 6.5l-11 11")
     val Plus = icon("M12 5.5v13", "M5.5 12h13")
@@ -901,6 +956,10 @@ private val SEARCH_HEIGHT = 24.dp
 private val CENTRED_ICON = 16.dp
 private val BUTTON = 24.dp
 private val MENU_BUTTON = 32.dp
+
+// The narrow button beside undo and redo that lists their steps, and how wide the list is at least.
+private val STEPS_WIDTH = 14.dp
+private val STEPS_MENU_WIDTH = 220.dp
 
 /** How far the unsaved dot sits above the tab's middle, so it is level with the bar's font's capitals. */
 private val DOT_RAISE = 0.67.dp

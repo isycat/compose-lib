@@ -222,6 +222,35 @@ class TabbedTitleBarTest {
     }
 
     @Test
+    fun undoListsItsStepsAndPickingOneGoesBackThroughEveryStepDownToIt() = runComposeUiTest {
+        var undone = 0
+        setContent {
+            MaterialTheme {
+                TabbedTitleBar(
+                    tabs,
+                    0,
+                    {},
+                    undoRedo = TitleBarUndoRedo(
+                        canUndo = true,
+                        canRedo = false,
+                        onUndo = {},
+                        onRedo = {},
+                        undoSteps = listOf("Set width to 20", "Add box", "Rename plate"),
+                        onUndoSteps = { undone += it },
+                    ),
+                )
+            }
+        }
+
+        onNodeWithTag(TitleBarTags.REDO_STEPS).assertDoesNotExist()
+        onNodeWithTag(TitleBarTags.UNDO_STEPS).performClick()
+        onNodeWithText("Add box").assertExists()
+        onNodeWithTag("${TitleBarTags.UNDO_STEPS}:1").performClick()
+        assertEquals(2, undone, "the second step undoes two")
+        onNodeWithText("Add box").assertDoesNotExist()
+    }
+
+    @Test
     fun theSearchBoxOpensTheSearch() = runComposeUiTest {
         var searched = 0
         setContent {
