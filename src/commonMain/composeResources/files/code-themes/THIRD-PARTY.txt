@@ -1,0 +1,37 @@
+Colour themes bundled with compose-lib's code themes, as moonshine-ide carries them:
+
+  2026-*.json, dark_*.json, light_*.json, hc_*.json, package.json, package.nls.json
+      Visual Studio Code's default colour themes (its theme-defaults extension), MIT,
+      Copyright (c) Microsoft Corporation; the licence is below.
+  OneDark-Pro.json, OneDark-Pro-night-flat.json
+      One Dark Pro and its Night Flat variant, 75c80ab (Binaryify/OneDark-Pro), MIT,
+      Copyright (c) 2013-2022 Binaryify; the licence is OneDark-Pro.LICENSE.txt.
+  Darcula.xml, Darcula_Kotlin.xml, Default.xml, Markdown*.xml, YAMLDarcula.xml
+      IntelliJ IDEA's colour schemes, Apache License 2.0; see NOTICE.txt and Apache-2.0.txt.
+
+---------------------------------------------------------
+microsoft/vscode (extensions/theme-defaults) - MIT
+
+MIT License
+
+Copyright (c) 2015 - present Microsoft Corporation
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

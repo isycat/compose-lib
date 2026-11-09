@@ -44,6 +44,8 @@ kotlin {
             // Fonts bundled with the components, so they draw the same on every platform.
             implementation(compose.components.resources)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            // Code themes: VS Code's theme and settings files are JSON with comments.
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -53,8 +55,6 @@ kotlin {
 
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
 
-            // Serialization
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
             // For TTS and native integration
             implementation("net.java.dev.jna:jna:5.14.0")

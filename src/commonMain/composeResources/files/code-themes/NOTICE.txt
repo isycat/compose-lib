@@ -1,0 +1,13 @@
+The colour schemes here are IntelliJ IDEA 2025.3's own, from intellij-community (Copyright 2000-2025 JetBrains s.r.o.
+and contributors, Apache License 2.0, https://www.apache.org/licenses/LICENSE-2.0): Darcula.xml and Default.xml are
+the Darcula and Default schemes of platform/platform-resources DefaultColorSchemesManager.xml; Darcula_Kotlin.xml,
+YAMLDarcula.xml and MarkdownDarcula.xml are what the Kotlin, YAML and Markdown plugins add to Darcula;
+MarkdownDefault.xml is what the Markdown plugin adds to Default.
+
+The licence's full text is Apache-2.0.txt, beside it.
+
+intellij-community's NOTICE file reads:
+
+    This software includes code from IntelliJ IDEA Community Edition
+    Copyright (C) JetBrains s.r.o.
+    https://www.jetbrains.com/idea/
