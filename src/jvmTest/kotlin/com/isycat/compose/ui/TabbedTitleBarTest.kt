@@ -152,6 +152,15 @@ class TabbedTitleBarTest {
         onNodeWithContentDescription("Close").assertDoesNotExist()
     }
 
+    // A browser has no title bar of its own in the page, so its bar shows the app's title, but no window buttons.
+    @Test
+    fun withoutAWindowTheTitleShowsWhenAsked() = runComposeUiTest {
+        setContent { MaterialTheme { TabbedTitleBar(tabs, 0, {}, title = "cardSTUDIO", showAppTitle = true) } }
+
+        onNodeWithTag(TitleBarTags.TITLE).assertTextEquals("cardSTUDIO")
+        onNodeWithContentDescription("Close").assertDoesNotExist()
+    }
+
     @Test
     fun theWindowsButtonsWorkTheWindow() = runComposeUiTest {
         val window = FakeWindow()

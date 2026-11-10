@@ -327,8 +327,9 @@ object TitleBarDefaults {
  * optional [menu] behind a hamburger, the [tabs], then the app's own [actions], an optional [search] box and
  * [undoRedo] buttons, and the window's buttons, [windowButtons] compact or as Windows draws its own.
  *
- * The icon, the title and the window's buttons only show when the bar stands in for the window's title bar, given
- * its [window]; without one (a window keeping the system's title bar, or a browser) the bar is a plain tab bar.
+ * The window's buttons only show when the bar stands in for the window's title bar, given its [window]. The icon and
+ * the title show with them, or without a window when [showAppTitle] says so (a browser, which has no title bar of its
+ * own in the page); without either (a window keeping the system's title bar) the bar is a plain tab bar.
  * [titleFollowsTab] makes the title start with the tab in front's, as `TitleBarDefaults.title` spells it; off, it's
  * always [title].
  *
@@ -350,6 +351,7 @@ fun TabbedTitleBar(
     titleFollowsTab: Boolean = false,
     appIcon: (@Composable () -> Unit)? = null,
     window: TitleBarWindow? = null,
+    showAppTitle: Boolean = window != null,
     windowButtons: TitleBarWindowButtons = TitleBarWindowButtons.Compact,
     menu: (@Composable (expanded: Boolean, onDismissRequest: () -> Unit) -> Unit)? = null,
     menuDescription: String = "Menu",
@@ -382,7 +384,7 @@ fun TabbedTitleBar(
             Modifier.fillMaxSize().padding(start = 4.dp, end = if (window != null) 0.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (window != null) {
+            if (showAppTitle) {
                 Spacer(Modifier.width(6.dp))
                 if (appIcon != null) {
                     Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
