@@ -290,6 +290,15 @@ class TabbedTitleBarTest {
         assertEquals(listOf(40, 96, 96), tabWidths(listOf(40, 300, 200), room = 100, minWidth = 96))
     }
 
+    /**
+     * Less room than the least width (a 360 dp window): tabs are cut to the room, so the one in front is whole when it's
+     * scrolled into view. Its close button was half cut off at 548 px (2026-11-10 check).
+     */
+    @Test
+    fun noTabIsWiderThanTheRoom() {
+        assertEquals(listOf(40, 70, 70), tabWidths(listOf(40, 300, 200), room = 70, minWidth = 96))
+    }
+
     /** With room to spare, tabs keep their own widths and New tab follows the last one. */
     @Test
     fun wideTabsKeepTheirWidths() = runComposeUiTest {

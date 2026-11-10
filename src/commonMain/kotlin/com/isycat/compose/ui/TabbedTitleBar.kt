@@ -534,7 +534,8 @@ internal fun tabWidths(natural: List<Int>, room: Int, minWidth: Int): List<Int> 
         left -= width
         count--
     }
-    val limit = maxOf(cap, minWidth)
+    // Never wider than the room, so a tab scrolled into view is whole, close button and all.
+    val limit = maxOf(cap, minOf(minWidth, room))
     return natural.map { minOf(it, limit) }
 }
 
