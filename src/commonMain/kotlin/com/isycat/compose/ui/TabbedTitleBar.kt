@@ -13,6 +13,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -241,6 +245,9 @@ object TitleBarDefaults {
     /** How tall the bar is. */
     val Height: Dp = 40.dp
 
+    /** How wide the bar must be to show the app's title; narrower, it shows only the icon. */
+    val AppTitleMinBarWidth: Dp = 600.dp
+
     /** The red Windows gives a close button under the pointer. */
     val CloseRed: Color = Color(0xFFC42B1C)
 
@@ -341,6 +348,10 @@ object TitleBarDefaults {
  * along the row: it follows the pointer, and each time it passes half of a neighbour, [onMoveTab] is called with its index
  * and the neighbour's, for the caller to swap them. A tab's title is at most
  * [tabTitleMaxWidth] wide, ending in an ellipsis past that; its tooltip can give the whole of it.
+ *
+ * When the tabs don't fit, the widest shrink first, their titles ending in an ellipsis, down to [tabMinWidth]; past that
+ * the tabs scroll, keeping the one in front in view. The + stays visible after them. Below [appTitleMinBarWidth] the bar
+ * leaves out the app's title (not its icon), to give the tabs its room.
  */
 @Composable
 fun TabbedTitleBar(
@@ -362,13 +373,15 @@ fun TabbedTitleBar(
     onMoveTab: ((from: Int, to: Int) -> Unit)? = null,
     newTabDescription: String = "New tab",
     tabTitleMaxWidth: Dp = Dp.Infinity,
+    tabMinWidth: Dp = MinTabWidth,
+    appTitleMinBarWidth: Dp = TitleBarDefaults.AppTitleMinBarWidth,
     actions: @Composable RowScope.() -> Unit = {},
     colors: TitleBarColors = TitleBarDefaults.colors(),
     typography: TitleBarTypography = TitleBarDefaults.typography(),
     tooltip: @Composable (String) -> Unit = { TitleBarDefaults.Tooltip(it, colors, typography) },
 ) {
     val bar = Bar(colors, typography, tooltip, tabTitleMaxWidth, window)
-    Box(
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .height(TitleBarDefaults.Height)
@@ -381,6 +394,7 @@ fun TabbedTitleBar(
                 },
             ),
     ) {
+        val showsTitle = maxWidth >= appTitleMinBarWidth
         Row(
             Modifier.fillMaxSize().padding(start = 4.dp, end = if (window != null) 0.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -393,29 +407,41 @@ fun TabbedTitleBar(
                     }
                     Spacer(Modifier.width(8.dp))
                 }
-                val shown = TitleBarDefaults.title(title, tabs.getOrNull(selectedTabIndex), titleFollowsTab)
-                Label(shown, typography.small, colors.title, Modifier.widthIn(max = 320.dp).testTag(TitleBarTags.TITLE))
-                Spacer(Modifier.width(6.dp))
+                if (showsTitle) {
+                    val shown = TitleBarDefaults.title(title, tabs.getOrNull(selectedTabIndex), titleFollowsTab)
+                    Label(shown, typography.small, colors.title, Modifier.widthIn(max = 320.dp).testTag(TitleBarTags.TITLE))
+                    Spacer(Modifier.width(6.dp))
+                }
             }
             if (menu != null) {
                 bar.MenuButton(menu, menuDescription)
                 Spacer(Modifier.width(6.dp))
             }
-            // The tabs share the row and the new tab button follows the last one. Where they don't fit at their own
-            // widths, each gets an equal share and its title ends in an ellipsis; below MinTabWidth each, they scroll.
-            // The button stays outside the scrolling, so it's always on screen.
-            Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.Bottom) {
+            // The tabs, then the new tab button, which is measured first so it always has its room: right after the last
+            // tab, or at the end once the tabs fill the row. Where the tabs don't fit at their own widths, the widest are
+            // cut to fit, their titles ending in an ellipsis; below [tabMinWidth] they scroll, and the button doesn't.
+            Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
                 BoxWithConstraints(Modifier.weight(1f, fill = false).fillMaxHeight()) {
-                    val share = if (tabs.isEmpty()) maxWidth else (maxWidth / tabs.size).coerceAtLeast(MinTabWidth)
-                    Row(Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.Bottom) {
+                    val room = constraints.maxWidth
+                    val scroll = rememberScrollState()
+                    // Where the tab in front is in the strip, so that when the tabs scroll it's kept in view.
+                    var front by remember { mutableStateOf<IntRange?>(null) }
+                    LaunchedEffect(front, room) {
+                        val span = front ?: return@LaunchedEffect
+                        when {
+                            span.first < scroll.value -> scroll.scrollTo(span.first)
+                            span.last > scroll.value + room -> scroll.scrollTo(span.last - room)
+                        }
+                    }
+                    Box(Modifier.fillMaxHeight().horizontalScroll(scroll)) {
                         val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
-                        tabs.forEachIndexed { index, tab ->
-                            key(tab.key) {
-                                bar.DocumentTab(
-                                    tab,
-                                    index == selectedTabIndex,
-                                    Modifier.widthIn(max = share).then(drag?.modifier(tab.key) ?: Modifier),
-                                ) { onTabSelected(index) }
+                        TabStrip(room, tabMinWidth, selectedTabIndex, { front = it }, Modifier.fillMaxHeight().testTag(TitleBarTags.TABS)) {
+                            tabs.forEachIndexed { index, tab ->
+                                key(tab.key) {
+                                    bar.DocumentTab(tab, index == selectedTabIndex, drag?.modifier(tab.key) ?: Modifier) {
+                                        onTabSelected(index)
+                                    }
+                                }
                             }
                         }
                     }
@@ -452,6 +478,64 @@ object TitleBarTags {
     const val MENU = "title-bar-menu"
     const val SEARCH = "title-bar-search"
     const val NEW_TAB = "title-bar-new-tab"
+    const val TABS = "title-bar-tabs"
+}
+
+/**
+ * The tabs in a row, each at its own width while they fit in [room] pixels. When they don't, the widest are cut to one
+ * width, so that they fit, but none below [minWidth] (one already narrower keeps its own). Each tab sits at the bottom.
+ * [onFront] is told where the tab at [front] is placed, from its start to its end.
+ */
+@Composable
+private fun TabStrip(
+    room: Int,
+    minWidth: Dp,
+    front: Int,
+    onFront: (IntRange?) -> Unit,
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content, modifier) { measurables, constraints ->
+        val natural = measurables.map { it.maxIntrinsicWidth(constraints.maxHeight) }
+        val widths = tabWidths(natural, room, minWidth.roundToPx())
+        val placeables =
+            measurables.mapIndexed { index, measurable ->
+                measurable.measure(Constraints(minWidth = widths[index], maxWidth = widths[index], maxHeight = constraints.maxHeight))
+            }
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else placeables.maxOfOrNull { it.height } ?: 0
+        layout(placeables.sumOf { it.width }, height) {
+            var x = 0
+            var span: IntRange? = null
+            placeables.forEachIndexed { index, placeable ->
+                placeable.placeRelative(x, height - placeable.height)
+                if (index == front) span = x..(x + placeable.width)
+                x += placeable.width
+            }
+            onFront(span)
+        }
+    }
+}
+
+/**
+ * The widths of tabs whose own widths are [natural], in [room]: their own while they fit; otherwise the widest are cut to
+ * the one width that makes them fit, though not below [minWidth].
+ */
+internal fun tabWidths(natural: List<Int>, room: Int, minWidth: Int): List<Int> {
+    if (natural.sum() <= room) return natural
+    var left = room
+    var count = natural.size
+    var cap = 0
+    for (width in natural.sorted()) {
+        val share = left / count
+        if (width > share) {
+            cap = share
+            break
+        }
+        left -= width
+        count--
+    }
+    val limit = maxOf(cap, minWidth)
+    return natural.map { minOf(it, limit) }
 }
 
 /**

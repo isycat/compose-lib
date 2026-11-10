@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -27,7 +28,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.runSkikoComposeUiTest
+import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.unit.Density
+import java.io.File
+import javax.imageio.ImageIO
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
@@ -267,11 +275,19 @@ class TabbedTitleBarTest {
         onNodeWithTag(TitleBarTags.NEW_TAB).performClick()
         assertEquals(1, added)
         longTabs.forEach { tab ->
-            assertTrue(layoutOf(tab.title).hasVisualOverflow, "${tab.title} isn't cut short")
+            assertTrue(isCut(tab.title), "${tab.title} isn't cut short")
         }
         // The first tabs are whole and before the button: they share the room rather than run under it.
         val first = onNodeWithText(longTabs.first().title).getUnclippedBoundsInRoot()
         assertTrue(first.right <= plus.left, "The first tab runs under New tab")
+    }
+
+    /** Tabs that don't fit: the widest are cut to one width, narrow ones keep theirs, and none goes below the least. */
+    @Test
+    fun theWidestTabsGiveWayFirst() {
+        assertEquals(listOf(100, 200), tabWidths(listOf(100, 200), room = 400, minWidth = 50))
+        assertEquals(listOf(60, 120, 120), tabWidths(listOf(60, 300, 200), room = 300, minWidth = 50))
+        assertEquals(listOf(40, 96, 96), tabWidths(listOf(40, 300, 200), room = 100, minWidth = 96))
     }
 
     /** With room to spare, tabs keep their own widths and New tab follows the last one. */
@@ -280,12 +296,43 @@ class TabbedTitleBarTest {
         val two = longTabs.take(2)
         setContent { MaterialTheme { Box(Modifier.width(1600.dp)) { TabbedTitleBar(two, 0, {}, onNewTab = {}) } } }
         two.forEach { tab ->
-            assertFalse(layoutOf(tab.title).hasVisualOverflow, "${tab.title} is cut short with room to spare")
+            assertFalse(isCut(tab.title), "${tab.title} is cut short with room to spare")
         }
         val last = onNodeWithText(two.last().title).getUnclippedBoundsInRoot()
         val plus = onNodeWithTag(TitleBarTags.NEW_TAB).getUnclippedBoundsInRoot()
         assertTrue(plus.left - last.right < 80.dp, "New tab isn't beside the last tab")
     }
+
+    /**
+     * The bar at phone width (360 dp, drawn at 2x) with a window, its title, menu, undo and redo and four long tabs,
+     * saved to build/screenshots/title-bar-360dp.png for review. The + must be whole inside the bar.
+     */
+    @Test
+    fun narrowBarScreenshot() = runSkikoComposeUiTest(Size(720f, 80f), Density(2f)) {
+        val window = FakeWindow()
+        setContent {
+            MaterialTheme {
+                TabbedTitleBar(
+                    longTabs.take(4),
+                    1,
+                    {},
+                    title = "cardSTUDIO",
+                    window = window,
+                    menu = { _, _ -> },
+                    undoRedo = TitleBarUndoRedo(canUndo = true, canRedo = false, onUndo = {}, onRedo = {}),
+                    onNewTab = {},
+                )
+            }
+        }
+        val plus = onNodeWithTag(TitleBarTags.NEW_TAB).getUnclippedBoundsInRoot()
+        assertTrue(plus.left >= 0.dp && plus.right <= PHONE, "New tab isn't whole on screen: $plus")
+        val file = File("build/screenshots/title-bar-360dp.png")
+        file.parentFile.mkdirs()
+        ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
+    }
+
+    // Whether [text] is drawn narrower than it is, so cut short with an ellipsis.
+    private fun ComposeUiTest.isCut(text: String): Boolean = layoutOf(text).let { it.multiParagraph.maxIntrinsicWidth > it.size.width }
 
     // How [text] was laid out where it's drawn.
     private fun ComposeUiTest.layoutOf(text: String): TextLayoutResult {
