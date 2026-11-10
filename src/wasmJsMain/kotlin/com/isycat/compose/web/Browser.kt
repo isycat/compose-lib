@@ -3,6 +3,9 @@
 package com.isycat.compose.web
 
 import kotlinx.coroutines.await
+import kotlin.wasm.unsafe.UnsafeWasmMemoryApi
+import kotlin.wasm.unsafe.wasmMemory
+import kotlin.wasm.unsafe.withScopedMemoryAllocator
 import kotlin.js.Promise
 
 /*
@@ -66,19 +69,38 @@ object BrowserStorage {
     }
 }
 
-/** A JS Int8Array's bytes, copied into Kotlin. */
+/**
+ * A JS Int8Array's bytes, copied into Kotlin: all at once into the module's memory, then from there into the array, so
+ * there's one call to JavaScript, not one a byte.
+ */
+@OptIn(UnsafeWasmMemoryApi::class)
 fun bytesOf(array: JsAny?): ByteArray {
     if (array == null) return ByteArray(0)
     val size = length(array)
-    return ByteArray(size) { byteAt(array, it) }
+    if (size == 0) return ByteArray(0)
+    return withScopedMemoryAllocator { memory ->
+        val at = memory.allocate(size)
+        copyIntoMemory(wasmMemory, array, at.address.toInt())
+        ByteArray(size) { (at + it).loadByte() }
+    }
 }
 
-/** [bytes] copied into a new JS Int8Array. */
+/** [bytes] copied into a new JS Int8Array, the same way as [bytesOf]. */
+@OptIn(UnsafeWasmMemoryApi::class)
 fun int8ArrayOf(bytes: ByteArray): JsAny {
-    val array = newInt8Array(bytes.size)
-    bytes.forEachIndexed { i, b -> setByte(array, i, b) }
-    return array
+    if (bytes.isEmpty()) return newInt8Array(0)
+    return withScopedMemoryAllocator { memory ->
+        val at = memory.allocate(bytes.size)
+        bytes.forEachIndexed { i, b -> (at + i).storeByte(b) }
+        copyOutOfMemory(wasmMemory, at.address.toInt(), bytes.size)
+    }
 }
+
+// Copies [array] into the module's [memory] at the address [at].
+private fun copyIntoMemory(memory: JsAny, array: JsAny, at: Int): Unit = js("{ new Int8Array(memory.buffer, at, array.length).set(array); }")
+
+// A new Int8Array of the [size] bytes at the address [at] in the module's [memory].
+private fun copyOutOfMemory(memory: JsAny, at: Int, size: Int): JsAny = js("new Int8Array(memory.buffer, at, size).slice()")
 
 private fun pickFiles(accept: String, multiple: Boolean): Promise<JsAny?> = js(
     """new Promise((resolve) => {
@@ -132,8 +154,5 @@ private fun item(array: JsAny, i: Int): JsAny = js("array[i]")
 
 private fun fileName(file: JsAny): String = js("file.name")
 
-private fun byteAt(array: JsAny, i: Int): Byte = js("array[i]")
-
 private fun newInt8Array(size: Int): JsAny = js("new Int8Array(size)")
 
-private fun setByte(array: JsAny, i: Int, b: Byte): Unit = js("{ array[i] = b; }")
