@@ -2,6 +2,7 @@ package com.isycat.compose.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -75,6 +76,27 @@ class HoverTooltipTest {
             assertEquals(1, popups(), "a press closes an open tooltip")
             assertEquals(2, clicks)
         }
+
+    // Along a row of buttons: the first tooltip waits, the next shows as soon as the pointer reaches its button.
+    @Test
+    fun `once a tooltip has shown the next one along shows at once`() = runSkikoComposeUiTest(Size(300f, 300f), Density(1f)) {
+        setContent {
+            Row(Modifier.size(300.dp)) {
+                HoverTooltip({ Text("First") }) { Box(Modifier.size(40.dp).testTag("first")) }
+                HoverTooltip({ Text("Second") }) { Box(Modifier.size(40.dp).testTag("second")) }
+            }
+        }
+        mainClock.autoAdvance = false
+        onNodeWithTag("first").performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(100)
+        assertEquals(1, popups(), "the first waits")
+        mainClock.advanceTimeBy(1_000)
+        assertEquals(2, popups(), "then shows")
+        onNodeWithTag("second").performMouseInput { moveTo(center) }
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Second").assertExists()
+    }
 
     private fun androidx.compose.ui.test.SkikoComposeUiTest.popups() = onAllNodes(isRoot()).fetchSemanticsNodes().size
 }

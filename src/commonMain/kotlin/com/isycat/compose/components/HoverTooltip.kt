@@ -2,6 +2,7 @@ package com.isycat.compose.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * A desktop hover tooltip that follows the cursor and adapts: it shows BELOW the cursor by default,
@@ -31,6 +35,9 @@ import kotlinx.coroutines.delay
  * It closes when its content leaves the screen ([LocalOnScreen]). A press on the content closes it, or stops it opening,
  * until the pointer leaves and comes back, as native tooltips do: one left open after a click would take the next click
  * below it.
+ *
+ * The first tooltip waits [delayMillis]; while one is open, or for [WARM_MILLIS] after it closed as the pointer left, the
+ * next shows at once, as native toolbars' do, so running along a row of buttons names each as it is reached.
  *
  * Replaces `TooltipArea`'s placement, whose flipped-above case left too small a gap above the cursor.
  */
@@ -70,6 +77,7 @@ fun HoverTooltip(
             }
             .onPointerEvent(PointerEventType.Move) { pointer = it.changes.first().position }
             .onPointerEvent(PointerEventType.Exit) {
+                if (show) Warmth.cooledAt = TimeSource.Monotonic.markNow()
                 hovering = false
                 show = false
                 pressed = false
@@ -84,12 +92,16 @@ fun HoverTooltip(
 
         LaunchedEffect(hovering, pressed) {
             if (hovering && !pressed) {
-                delay(delayMillis)
+                if (!Warmth.warm) delay(delayMillis)
                 show = true
             }
         }
 
         if (show && onScreen) {
+            DisposableEffect(Unit) {
+                Warmth.open++
+                onDispose { Warmth.open-- }
+            }
             val provider = remember(pointer, gapBelow, gapAbove, margin) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
@@ -120,4 +132,14 @@ fun HoverTooltip(
             }
         }
     }
+}
+
+/** How long after a tooltip closed, its pointer gone on, the next shows at once. */
+const val WARM_MILLIS = 600L
+
+// Whether a tooltip is open now or closed a moment ago: one pointer, so one for the whole app.
+private object Warmth {
+    var open = 0
+    var cooledAt: TimeMark? = null
+    val warm: Boolean get() = open > 0 || cooledAt?.let { it.elapsedNow() < WARM_MILLIS.milliseconds } == true
 }
