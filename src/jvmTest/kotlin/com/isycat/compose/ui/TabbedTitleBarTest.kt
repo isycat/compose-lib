@@ -282,6 +282,26 @@ class TabbedTitleBarTest {
         assertTrue(first.right <= plus.left, "The first tab runs under New tab")
     }
 
+    /** At phone width, the tab in front's close button closes that tab only, once, and the bar stays. */
+    @Test
+    fun narrowCloseClosesOnlyTheTabInFront() = runComposeUiTest {
+        val closed = mutableListOf<String>()
+        val tabs = longTabs.take(4).map { TitleBarTab(it.title, key = it.key, onClose = { closed += it.title }) }
+        val window = FakeWindow()
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(PHONE)) { TabbedTitleBar(tabs, 2, {}, window = window, menu = { _, _ -> }, onNewTab = {}) }
+            }
+        }
+        val close = onNodeWithContentDescription("Close ${tabs[2].title}")
+        val bounds = close.getUnclippedBoundsInRoot()
+        assertTrue(bounds.left >= 0.dp && bounds.right <= PHONE, "The close button isn't whole on screen: $bounds")
+        close.performClick()
+        assertEquals(listOf(tabs[2].title), closed)
+        assertEquals(0, window.closed, "The window was closed")
+        onNodeWithTag(TitleBarTags.NEW_TAB).assertExists()
+    }
+
     /** Tabs that don't fit: the widest are cut to one width, narrow ones keep theirs, and none goes below the least. */
     @Test
     fun theWidestTabsGiveWayFirst() {
