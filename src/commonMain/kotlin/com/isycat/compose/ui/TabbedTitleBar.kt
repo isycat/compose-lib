@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,6 +35,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -47,42 +49,47 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextPainter
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.TextPainter
-import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.ImageBitmap
-import kotlin.math.roundToInt
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.isycat.compose.components.HoverTooltip
+import com.isycat.compose.components.SquareButton
+import com.isycat.compose.components.SquareButtonColors
 import com.isycat.compose.resources.Res
 import com.isycat.compose.resources.roboto_bold
 import com.isycat.compose.resources.roboto_italic
@@ -91,14 +98,7 @@ import com.isycat.compose.resources.roboto_regular
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.getFontResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.roundToInt
 
 /**
  * One document's tab in a [TabbedTitleBar]: its [title], an [icon] before it (drawn about 14dp, in the tab's icon
@@ -675,34 +675,16 @@ private class Bar(
         width: Dp = size,
         onClick: () -> Unit,
     ) {
-        val interaction = remember { MutableInteractionSource() }
-        val hovered by interaction.collectIsHoveredAsState()
-        val background =
-            when {
-                selected -> colors.selected
-                hovered && enabled -> colors.hover
-                else -> Color.Transparent
-            }
-        val tint =
-            when {
-                !enabled -> colors.iconDisabled
-                selected -> colors.accent
-                hovered -> colors.iconHover
-                else -> colors.icon
-            }
+        val look = SquareButtonColors(
+            hover = colors.hover,
+            selected = colors.selected,
+            icon = colors.icon,
+            iconHover = colors.iconHover,
+            iconSelected = colors.accent,
+            iconDisabled = colors.iconDisabled,
+        )
         Tip(description) {
-            Box(
-                modifier
-                    .then(takesClicks())
-                    .size(width, size)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(background)
-                    .hoverable(interaction)
-                    .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-                    .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
-                    .semantics { contentDescription = description },
-                contentAlignment = Alignment.Center,
-            ) {
+            SquareButton(description, modifier.then(takesClicks()), enabled, selected, width, size, look, onClick) { tint ->
                 LineIcon(icon, tint, iconSize)
             }
         }
