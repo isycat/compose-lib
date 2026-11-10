@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -60,7 +61,8 @@ object SquareButtonDefaults {
 /**
  * A small button lit square under the pointer and while [selected], with no ripple: the highlight the title bar's
  * buttons have, for every icon button that wants it. [content] draws what it holds, in the tint it is handed for its
- * state; [description] names it for accessibility. A tooltip, where one is wanted, goes round it.
+ * state; [description] names it for accessibility. A tooltip, where one is wanted, goes round it. A click leaves the
+ * keyboard where it was, as a toolbar's buttons do, so the app's keys, Space among them, never click it again.
  */
 @Composable
 fun SquareButton(
@@ -93,6 +95,7 @@ fun SquareButton(
             .clip(SquareButtonDefaults.shape)
             .background(background)
             .hoverable(interaction)
+            .focusProperties { canFocus = false }
             .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
             .semantics { contentDescription = description },
