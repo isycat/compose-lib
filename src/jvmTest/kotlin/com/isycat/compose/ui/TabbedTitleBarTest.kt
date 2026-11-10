@@ -1,5 +1,7 @@
 package com.isycat.compose.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -7,7 +9,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -23,9 +28,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class TabbedTitleBarTest {
@@ -240,5 +248,53 @@ class TabbedTitleBarTest {
         onNodeWithText("Ctrl+Space").assertExists()
         onNodeWithTag(TitleBarTags.SEARCH).performClick()
         assertEquals(1, searched)
+    }
+
+    private val longTabs =
+        (1..5).map { i -> TitleBarTab("Special Illustration Rare card number $i.cscard", key = "t$i", onClose = {}) }
+
+    /** At phone width (360 dp), tabs share the bar with their titles cut short, and New tab stays on screen. */
+    @Test
+    fun narrowTabsShrinkAndNewTabStaysOnScreen() = runComposeUiTest {
+        var added = 0
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(PHONE)) { TabbedTitleBar(longTabs, 0, {}, onNewTab = { added++ }) }
+            }
+        }
+        val plus = onNodeWithTag(TitleBarTags.NEW_TAB).getUnclippedBoundsInRoot()
+        assertTrue(plus.right <= PHONE, "New tab runs past the bar: ${plus.right}")
+        onNodeWithTag(TitleBarTags.NEW_TAB).performClick()
+        assertEquals(1, added)
+        longTabs.forEach { tab ->
+            assertTrue(layoutOf(tab.title).hasVisualOverflow, "${tab.title} isn't cut short")
+        }
+        // The first tabs are whole and before the button: they share the room rather than run under it.
+        val first = onNodeWithText(longTabs.first().title).getUnclippedBoundsInRoot()
+        assertTrue(first.right <= plus.left, "The first tab runs under New tab")
+    }
+
+    /** With room to spare, tabs keep their own widths and New tab follows the last one. */
+    @Test
+    fun wideTabsKeepTheirWidths() = runComposeUiTest {
+        val two = longTabs.take(2)
+        setContent { MaterialTheme { Box(Modifier.width(1600.dp)) { TabbedTitleBar(two, 0, {}, onNewTab = {}) } } }
+        two.forEach { tab ->
+            assertFalse(layoutOf(tab.title).hasVisualOverflow, "${tab.title} is cut short with room to spare")
+        }
+        val last = onNodeWithText(two.last().title).getUnclippedBoundsInRoot()
+        val plus = onNodeWithTag(TitleBarTags.NEW_TAB).getUnclippedBoundsInRoot()
+        assertTrue(plus.left - last.right < 80.dp, "New tab isn't beside the last tab")
+    }
+
+    // How [text] was laid out where it's drawn.
+    private fun ComposeUiTest.layoutOf(text: String): TextLayoutResult {
+        val results = mutableListOf<TextLayoutResult>()
+        onNodeWithText(text).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+        return results.single()
+    }
+
+    private companion object {
+        val PHONE = 360.dp
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -400,14 +401,23 @@ fun TabbedTitleBar(
                 bar.MenuButton(menu, menuDescription)
                 Spacer(Modifier.width(6.dp))
             }
-            Row(
-                Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
-                tabs.forEachIndexed { index, tab ->
-                    key(tab.key) {
-                        bar.DocumentTab(tab, index == selectedTabIndex, drag?.modifier(tab.key) ?: Modifier) { onTabSelected(index) }
+            // The tabs share the row and the new tab button follows the last one. Where they don't fit at their own
+            // widths, each gets an equal share and its title ends in an ellipsis; below MinTabWidth each, they scroll.
+            // The button stays outside the scrolling, so it's always on screen.
+            Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.Bottom) {
+                BoxWithConstraints(Modifier.weight(1f, fill = false).fillMaxHeight()) {
+                    val share = if (tabs.isEmpty()) maxWidth else (maxWidth / tabs.size).coerceAtLeast(MinTabWidth)
+                    Row(Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.Bottom) {
+                        val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
+                        tabs.forEachIndexed { index, tab ->
+                            key(tab.key) {
+                                bar.DocumentTab(
+                                    tab,
+                                    index == selectedTabIndex,
+                                    Modifier.widthIn(max = share).then(drag?.modifier(tab.key) ?: Modifier),
+                                ) { onTabSelected(index) }
+                            }
+                        }
                     }
                 }
                 if (onNewTab != null) {
@@ -682,7 +692,13 @@ private class Bar(
                     }
                     Spacer(Modifier.width(7.dp))
                 }
-                Label(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab, Modifier.widthIn(max = tabTitleMaxWidth))
+                // Weighted, so it's measured after the tab's fixed parts and gives way first when the tab is narrowed.
+                Label(
+                    tab.title,
+                    typography.tab,
+                    if (selected) colors.selectedTabContent else colors.tab,
+                    Modifier.weight(1f, fill = false).widthIn(max = tabTitleMaxWidth),
+                )
                 Spacer(Modifier.width(4.dp))
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                     val close = tab.onClose
@@ -866,3 +882,6 @@ private fun Modifier.tracksPointerOver(onChange: (Boolean) -> Unit): Modifier =
             }
         }
     }
+
+/** The narrowest a tab gets as tabs share the bar: its mark, icon and close button and a few letters of its title. */
+val MinTabWidth = 96.dp
