@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerType
@@ -439,7 +440,7 @@ fun TabbedTitleBar(
                         }
                     }
                     // A touch swipes the tabs along (a long press then drags one); a mouse wheel scrolls them too.
-                    Box(Modifier.fillMaxHeight().wheelScrollsSideways(scroll).horizontalScroll(scroll)) {
+                    Box(Modifier.fillMaxHeight().wheelScrollsSideways(scroll, tabMinWidth).horizontalScroll(scroll)) {
                         val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
                         TabStrip(room, tabMinWidth, selectedTabIndex, { front = it }, Modifier.fillMaxHeight().testTag(TitleBarTags.TABS)) {
                             tabs.forEachIndexed { index, tab ->
@@ -664,28 +665,27 @@ private fun rememberTabDrag(tabs: List<TitleBarTab>, onMoveTab: ((Int, Int) -> U
 
 /**
  * A mouse wheel turned over a strip that scrolls sideways scrolls it, as a wheel does over a browser's tabs: a mouse
- * has no sideways wheel, and Compose only scrolls a row with one (or with Shift held). A sideways wheel or touchpad
- * swipe is left to the row's own scrolling.
+ * has no sideways wheel, and Compose only scrolls a row with one (or with Shift held). One notch moves it [step], the
+ * width of a tab cut to fit. A sideways wheel or touchpad swipe is left to the row's own scrolling.
  */
-private fun Modifier.wheelScrollsSideways(scroll: ScrollState): Modifier =
-    pointerInput(scroll) {
+private fun Modifier.wheelScrollsSideways(scroll: ScrollState, step: Dp): Modifier =
+    pointerInput(scroll, step) {
         listenForWheelNotches()
         awaitPointerEventScope {
             while (true) {
-                val event = awaitPointerEvent()
+                // Taken before the row inside sees it (the Initial pass runs outside in), so the row's own wheel
+                // scrolling never moves the tabs as well.
+                val event = awaitPointerEvent(PointerEventPass.Initial)
                 if (event.type != PointerEventType.Scroll) continue
                 val change = event.changes.firstOrNull() ?: continue
                 val delta = change.scrollDelta
                 if (abs(delta.y) <= abs(delta.x) || scroll.maxValue == 0) continue
-                // In notches, not the browser's pixels: a notch steps about a tab, wherever the bar runs.
-                scroll.dispatchRawDelta(event.wheelNotches() * WHEEL_STEP.toPx())
+                // In notches, not the browser's pixels: a notch steps one tab, wherever the bar runs.
+                scroll.dispatchRawDelta(event.wheelNotches() * step.toPx())
                 change.consume()
             }
         }
     }
-
-// How far one notch of a mouse wheel scrolls the tabs.
-private val WHEEL_STEP = 48.dp
 
 /** Reports the bar's area to [window], which moves the window from it. */
 private fun Modifier.reportsCaption(window: TitleBarWindow): Modifier =

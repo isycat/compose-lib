@@ -347,7 +347,7 @@ class TabbedTitleBarTest {
         assertEquals(emptyList(), moves, "The swipe moved a tab")
     }
 
-    /** Web gate 2026-11-11: one notch jumped the whole strip. One notch moves the tabs 48 dp, about a tab. */
+    /** Web gate 2026-11-11: one notch jumped the whole strip, then moved only a quarter of a tab. One notch moves one tab. */
     @Test
     fun oneWheelNotchStepsAboutOneTab() = runComposeUiTest {
         phoneBar(mutableListOf())
@@ -358,7 +358,7 @@ class TabbedTitleBarTest {
             scroll(-1f)
         }
         waitForIdle()
-        assertEquals(48f, (leftOf(first) - before).value, 0.5f, "One notch didn't move the tabs 48 dp")
+        assertEquals(MinTabWidth.value, (leftOf(first) - before).value, 0.5f, "One notch didn't move the tabs one tab")
     }
 
     /** Web gate 2026-11-11: a tab touched in a swipe kept its hover look and close button after the finger lifted. */
