@@ -2,21 +2,21 @@ package com.isycat.compose.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -38,7 +38,9 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +53,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -58,16 +61,23 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -77,9 +87,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.isycat.compose.components.HoverTooltip
 import com.isycat.compose.resources.Res
 import com.isycat.compose.resources.roboto_bold
@@ -89,14 +101,7 @@ import com.isycat.compose.resources.roboto_regular
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.getFontResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.abs
 
 /**
  * One document's tab in a [TabbedTitleBar]: its [title], an [icon] before it (drawn about 14dp, in the tab's icon
@@ -433,7 +438,8 @@ fun TabbedTitleBar(
                             span.last > scroll.value + room -> scroll.scrollTo(span.last - room)
                         }
                     }
-                    Box(Modifier.fillMaxHeight().horizontalScroll(scroll)) {
+                    // A touch swipes the tabs along (a long press then drags one); a mouse wheel scrolls them too.
+                    Box(Modifier.fillMaxHeight().wheelScrollsSideways(scroll).horizontalScroll(scroll)) {
                         val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
                         TabStrip(room, tabMinWidth, selectedTabIndex, { front = it }, Modifier.fillMaxHeight().testTag(TitleBarTags.TABS)) {
                             tabs.forEachIndexed { index, tab ->
@@ -587,20 +593,38 @@ private class TabDrag(
             .zIndex(if (dragged == key) 1f else 0f)
             .graphicsLayer { translationX = if (dragged == key) offset else 0f }
             .pointerInput(key) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        dragged = key
-                        offset = 0f
-                        tabs().indexOfFirst { it.key == key }.takeIf { it >= 0 }?.let { onSelect()(it) }
-                    },
-                    onDragEnd = { stop() },
-                    onDragCancel = { stop() },
-                ) { change, amount ->
-                    change.consume()
-                    offset += amount
-                    step(key)
+                // A mouse drags a tab at once. A touch swipe is left to the strip, which scrolls with it, so a touch
+                // drags a tab only after a long press.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val dragging =
+                        if (down.type == PointerType.Touch) {
+                            awaitLongPressOrCancellation(down.id)?.also { start(key) }
+                        } else {
+                            awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+                                change.consume()
+                                start(key)
+                                move(key, over)
+                            }
+                        } ?: return@awaitEachGesture
+                    horizontalDrag(dragging.id) { change ->
+                        change.consume()
+                        move(key, change.positionChange().x)
+                    }
+                    stop()
                 }
             }
+
+    private fun start(key: Any) {
+        dragged = key
+        offset = 0f
+        tabs().indexOfFirst { it.key == key }.takeIf { it >= 0 }?.let { onSelect()(it) }
+    }
+
+    private fun move(key: Any, by: Float) {
+        offset += by
+        step(key)
+    }
 
     private fun stop() {
         dragged = null
@@ -636,6 +660,29 @@ private fun rememberTabDrag(tabs: List<TitleBarTab>, onMoveTab: ((Int, Int) -> U
     val drag = remember { TabDrag({ currentTabs }, { move }, { select }) }
     return drag.takeIf { onMoveTab != null }
 }
+
+/**
+ * A mouse wheel turned over a strip that scrolls sideways scrolls it, as a wheel does over a browser's tabs: a mouse
+ * has no sideways wheel, and Compose only scrolls a row with one (or with Shift held). A sideways wheel or touchpad
+ * swipe is left to the row's own scrolling.
+ */
+private fun Modifier.wheelScrollsSideways(scroll: ScrollState): Modifier =
+    pointerInput(scroll) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type != PointerEventType.Scroll) continue
+                val change = event.changes.firstOrNull() ?: continue
+                val delta = change.scrollDelta
+                if (abs(delta.y) <= abs(delta.x) || scroll.maxValue == 0) continue
+                scroll.dispatchRawDelta(delta.y * WHEEL_STEP.toPx())
+                change.consume()
+            }
+        }
+    }
+
+// How far one notch of a mouse wheel scrolls the tabs.
+private val WHEEL_STEP = 48.dp
 
 /** Reports the bar's area to [window], which moves the window from it. */
 private fun Modifier.reportsCaption(window: TitleBarWindow): Modifier =

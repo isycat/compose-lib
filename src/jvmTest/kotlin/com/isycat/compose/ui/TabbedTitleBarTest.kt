@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -21,23 +22,24 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.runSkikoComposeUiTest
-import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import java.io.File
 import javax.imageio.ImageIO
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -300,6 +302,45 @@ class TabbedTitleBarTest {
         assertEquals(listOf(tabs[2].title), closed)
         assertEquals(0, window.closed, "The window was closed")
         onNodeWithTag(TitleBarTags.NEW_TAB).assertExists()
+    }
+
+    // Four long tabs at phone width, the last one in front, so the first ones are scrolled out of sight.
+    private fun ComposeUiTest.phoneBar(moves: MutableList<Pair<Int, Int>>) {
+        val tabs = longTabs.take(4)
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(PHONE)) {
+                    TabbedTitleBar(tabs, 3, {}, onNewTab = {}, onMoveTab = { from, to -> moves += from to to })
+                }
+            }
+        }
+    }
+
+    private fun ComposeUiTest.leftOf(title: String) = onNodeWithText(title).getUnclippedBoundsInRoot().left
+
+    /** Web gate 2026-11-11: with 4 tabs at 360 dp a mouse wheel didn't reach the first ones. It scrolls them back now. */
+    @Test
+    fun aMouseWheelScrollsHiddenTabsIntoView() = runComposeUiTest {
+        phoneBar(mutableListOf())
+        val first = longTabs.first().title
+        val before = leftOf(first)
+        assertTrue(before < 0.dp, "The first tab isn't scrolled out of sight to start with: $before")
+        onNodeWithTag(TitleBarTags.TABS).performMouseInput { scroll(-20f) }
+        waitForIdle()
+        assertTrue(leftOf(first) >= 0.dp, "The wheel didn't bring the first tab back: ${leftOf(first)}")
+    }
+
+    /** A touch swipe scrolls the tabs rather than dragging one of them to a new place. */
+    @Test
+    fun aTouchSwipeScrollsTheTabsWithoutMovingOne() = runComposeUiTest {
+        val moves = mutableListOf<Pair<Int, Int>>()
+        phoneBar(moves)
+        val first = longTabs.first().title
+        val before = leftOf(first)
+        onNodeWithTag(TitleBarTags.TABS).performTouchInput { swipeRight(startX = 10f, endX = width.toFloat() - 10f) }
+        waitForIdle()
+        assertTrue(leftOf(first) > before, "The swipe didn't scroll the tabs")
+        assertEquals(emptyList(), moves, "The swipe moved a tab")
     }
 
     /** Tabs that don't fit: the widest are cut to one width, narrow ones keep theirs, and none goes below the least. */
