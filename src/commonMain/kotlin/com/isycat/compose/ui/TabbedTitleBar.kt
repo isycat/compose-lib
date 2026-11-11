@@ -669,6 +669,7 @@ private fun rememberTabDrag(tabs: List<TitleBarTab>, onMoveTab: ((Int, Int) -> U
  */
 private fun Modifier.wheelScrollsSideways(scroll: ScrollState): Modifier =
     pointerInput(scroll) {
+        listenForWheelNotches()
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()
@@ -676,7 +677,8 @@ private fun Modifier.wheelScrollsSideways(scroll: ScrollState): Modifier =
                 val change = event.changes.firstOrNull() ?: continue
                 val delta = change.scrollDelta
                 if (abs(delta.y) <= abs(delta.x) || scroll.maxValue == 0) continue
-                scroll.dispatchRawDelta(delta.y * WHEEL_STEP.toPx())
+                // In notches, not the browser's pixels: a notch steps about a tab, wherever the bar runs.
+                scroll.dispatchRawDelta(event.wheelNotches() * WHEEL_STEP.toPx())
                 change.consume()
             }
         }
@@ -1011,6 +1013,11 @@ private fun Modifier.tracksPointerOver(onChange: (Boolean) -> Unit): Modifier =
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()
+                // Hover is the mouse's: a finger lifted off a tab mustn't leave it lit with its close button showing.
+                if (event.changes.any { it.type == PointerType.Touch }) {
+                    onChange(false)
+                    continue
+                }
                 onChange(event.type != PointerEventType.Exit && event.changes.none { it.isOutOfBounds(size, Size.Zero) })
             }
         }

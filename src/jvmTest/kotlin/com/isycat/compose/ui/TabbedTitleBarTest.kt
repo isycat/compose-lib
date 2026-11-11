@@ -347,6 +347,30 @@ class TabbedTitleBarTest {
         assertEquals(emptyList(), moves, "The swipe moved a tab")
     }
 
+    /** Web gate 2026-11-11: one notch jumped the whole strip. One notch moves the tabs 48 dp, about a tab. */
+    @Test
+    fun oneWheelNotchStepsAboutOneTab() = runComposeUiTest {
+        phoneBar(mutableListOf())
+        val first = longTabs.first().title
+        val before = leftOf(first)
+        onNodeWithText(longTabs[3].title).performMouseInput {
+            moveTo(center)
+            scroll(-1f)
+        }
+        waitForIdle()
+        assertEquals(48f, (leftOf(first) - before).value, 0.5f, "One notch didn't move the tabs 48 dp")
+    }
+
+    /** Web gate 2026-11-11: a tab touched in a swipe kept its hover look and close button after the finger lifted. */
+    @Test
+    fun aTouchLeavesNoTabLookingHovered() = runComposeUiTest {
+        phoneBar(mutableListOf())
+        val other = longTabs[2].title
+        onNodeWithText(other).performTouchInput { swipeRight(startX = 10f, endX = 50f) }
+        waitForIdle()
+        onNodeWithContentDescription("Close $other").assertDoesNotExist()
+    }
+
     /** Tabs that don't fit: the widest are cut to one width, narrow ones keep theirs, and none goes below the least. */
     @Test
     fun theWidestTabsGiveWayFirst() {
