@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
  * them (`AbstractColorsScheme`): each kind of text's attributes (colour, background, bold and italic, and a line drawn
  * along or round it in its own colour), and the editor's colours. A scheme built on Darcula or the light Default finds
  * what it leaves out there; both are bundled as IntelliJ IDEA 2025.3 ships them (intellij-community, Apache 2.0), with
- * what the Kotlin, YAML and Markdown plugins add to Darcula.
+ * what the Kotlin, Compose, YAML and Markdown plugins add, and Islands Dark, its default dark scheme.
  */
 object JetBrainsSchemes {
     /** A scheme as its file holds it, before any parent is looked to. */
@@ -22,16 +22,24 @@ object JetBrainsSchemes {
 
     private var darcula: CodeTheme? = null
     private var default: CodeTheme? = null
+    private var islandsDark: CodeTheme? = null
 
-    /** Darcula, as IntelliJ IDEA 2025.3 ships it, with the Kotlin, YAML and Markdown plugins' additions. */
+    /** Darcula, as IntelliJ IDEA 2025.3 ships it, with the Kotlin, Compose, YAML and Markdown plugins' additions. */
     suspend fun darcula(): CodeTheme = darcula ?: bundled(
         "Darcula",
         dark = true,
-        additions = listOf("Darcula_Kotlin.xml", "YAMLDarcula.xml", "MarkdownDarcula.xml", "MarkdownDefault.xml"),
+        additions = listOf("Darcula_Kotlin.xml", "IntelliJComposeColorSchemeDarcula.xml", "YAMLDarcula.xml", "MarkdownDarcula.xml", "MarkdownDefault.xml"),
     ).also { darcula = it }
 
-    /** The light Default scheme, as IntelliJ IDEA 2025.3 ships it. */
-    suspend fun default(): CodeTheme = default ?: bundled("Default", dark = false, additions = listOf("MarkdownDefault.xml")).also { default = it }
+    /** The light Default scheme, as IntelliJ IDEA 2025.3 ships it, with the Kotlin, Compose and Markdown plugins' additions. */
+    suspend fun default(): CodeTheme = default ?: bundled(
+        "Default",
+        dark = false,
+        additions = listOf("Default_Kotlin.xml", "IntelliJComposeColorSchemeDefault.xml", "MarkdownDefault.xml"),
+    ).also { default = it }
+
+    /** Islands Dark, IntelliJ IDEA 2025.3's default dark scheme (its default Islands Dark theme's), on Darcula. */
+    suspend fun islandsDark(): CodeTheme = islandsDark ?: load(bundledText("IslandsDark.xml"), "Islands Dark").also { islandsDark = it }
 
     private suspend fun bundled(name: String, dark: Boolean, additions: List<String>): CodeTheme {
         val scheme = parse(bundledText("$name.xml"))
@@ -142,7 +150,8 @@ object JetBrainsSchemes {
             selection = selection,
             lineNumber = colour("LINE_NUMBERS_COLOR") ?: foreground.copy(alpha = 0.5f),
             lineNumberCaret = colour("LINE_NUMBER_ON_CARET_ROW_COLOR") ?: foreground,
-            gutter = colour("GUTTER_BACKGROUND") ?: background,
+            // The new UI's gutter (EditorGutterColor): its own key, else the editor's background; GUTTER_BACKGROUND is the old UI's.
+            gutter = colour("EDITOR_GUTTER_BACKGROUND") ?: background,
             matchedBracket = attribute("MATCHED_BRACE_ATTRIBUTES")?.background ?: Color.Transparent,
             error = attribute("ERRORS_ATTRIBUTES")?.effectColor ?: Color(0xFFBC3F3C),
             warning = attribute("WARNING_ATTRIBUTES")?.effectColor ?: Color(0xFFBE9117),

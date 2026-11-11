@@ -1,8 +1,10 @@
 The colour schemes here are IntelliJ IDEA 2025.3's own, from intellij-community (Copyright 2000-2025 JetBrains s.r.o.
 and contributors, Apache License 2.0, https://www.apache.org/licenses/LICENSE-2.0): Darcula.xml and Default.xml are
-the Darcula and Default schemes of platform/platform-resources DefaultColorSchemesManager.xml; Darcula_Kotlin.xml,
-YAMLDarcula.xml and MarkdownDarcula.xml are what the Kotlin, YAML and Markdown plugins add to Darcula;
-MarkdownDefault.xml is what the Markdown plugin adds to Default.
+the Darcula and Default schemes of platform/platform-resources DefaultColorSchemesManager.xml; IslandsDark.xml is
+platform/platform-resources' themes/islands/IslandSchemeDark.xml, the editor scheme of 2025.3's default Islands Dark
+theme; Darcula_Kotlin.xml, IntelliJComposeColorSchemeDarcula.xml, YAMLDarcula.xml and MarkdownDarcula.xml are what the
+Kotlin, Compose, YAML and Markdown plugins add to Darcula; Default_Kotlin.xml, IntelliJComposeColorSchemeDefault.xml
+and MarkdownDefault.xml are what the Kotlin, Compose and Markdown plugins add to Default.
 
 The licence's full text is Apache-2.0.txt, beside it.
 

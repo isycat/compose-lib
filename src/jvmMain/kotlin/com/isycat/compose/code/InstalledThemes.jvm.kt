@@ -12,30 +12,17 @@ import kotlin.io.path.name
 import kotlin.io.path.readText
 
 /**
- * The themes the person's IDEs have on this machine, as moonshine's IDE finds them: every scheme their JetBrains IDEs
- * keep (the newest IDE's first, each name once), Darcula aside, their VS Code as its settings.json makes it, and every
- * colour theme their VS Code has installed. Read from disk, off the interface's thread.
+ * The scheme the person's JetBrains IDE uses, as moonshine's IDE finds it: IntelliJ IDEA's, else the newest IDE's that
+ * has one in use; not isycat, which is bundled. Read from disk, off the interface's thread.
  */
 internal actual suspend fun installedChoices(): List<CodeThemes.Choice> = withContext(Dispatchers.IO) {
-    val out = ArrayList<CodeThemes.Choice>()
-    val seen = HashSet<String>()
-    for (scheme in runCatching { jetBrainsSchemes() }.getOrDefault(emptyList()).sortedByDescending { it.current }) {
-        if (!seen.add(scheme.name)) continue
-        out += CodeThemes.Choice("jetbrains:${scheme.file}", scheme.name, "${scheme.product}${if (scheme.current) ", in use" else ""}") {
-            withContext(Dispatchers.IO) { JetBrainsSchemes.load(scheme.file.readText(), scheme.file.name, scheme.font) }
-        }
-    }
-    vsCodeSettings()?.let { settings ->
-        out += CodeThemes.Choice("vscode-settings:$settings", SETTINGS_LABEL, "settings.json over ${VsCodeThemes.DEFAULT_THEME}") {
-            withContext(Dispatchers.IO) { VsCodeThemes.fromSettings(settings.readText(), SETTINGS_LABEL, "VS Code settings $settings", ::installedVsCodeTheme) }
-        }
-    }
-    for (name in runCatching { vsCodeThemeNames() }.getOrDefault(emptyList())) {
-        out += CodeThemes.Choice("vscode:$name", name, "VS Code") {
-            VsCodeThemes.theme(installedVsCodeTheme(name) ?: error("VS Code no longer has $name"))
-        }
-    }
-    out
+    listOfNotNull(
+        runCatching { jetBrainsSchemes() }.getOrDefault(emptyList()).firstOrNull { it.current }?.takeIf { it.name != ISYCAT }?.let { scheme ->
+            CodeThemes.Choice("jetbrains:${scheme.file}", scheme.name, "yours, ${scheme.product}") {
+                withContext(Dispatchers.IO) { JetBrainsSchemes.load(scheme.file.readText(), scheme.file.name, scheme.font) }
+            }
+        },
+    )
 }
 
 internal actual suspend fun installedVsCodeTheme(name: String): VsCodeTheme? = withContext(Dispatchers.IO) {
@@ -51,18 +38,20 @@ internal actual suspend fun installedVsCodeTheme(name: String): VsCodeTheme? = w
     null
 }
 
-private const val SETTINGS_LABEL = "VS Code, as you set it up"
+private const val ISYCAT = "isycat"
 
 /** A scheme one of the person's JetBrains IDEs has, whether it is the one in use, and the IDE's editor font. */
 private class Installed(val product: String, val file: Path, val name: String, val current: Boolean, val font: CodeFont?)
 
-/** The schemes the person's JetBrains IDEs keep, each IDE's own folder under its config folder, newest first. */
+/** The schemes the person's JetBrains IDEs keep, each IDE's own folder under its config folder: IntelliJ IDEA's first, newest first. */
 private fun jetBrainsSchemes(): List<Installed> {
     val config = System.getenv("APPDATA")?.let { Path.of(it, "JetBrains") }
         ?: Path.of(System.getProperty("user.home"), if (System.getProperty("os.name").startsWith("Mac")) "Library/Application Support/JetBrains" else ".config/JetBrains")
     if (!config.isDirectory()) return emptyList()
     val out = ArrayList<Installed>()
-    for (ide in config.listDirectoryEntries().filter { it.isDirectory() && it.resolve("options").isDirectory() }.sortedByDescending { it.name }) {
+    val ides = config.listDirectoryEntries().filter { it.isDirectory() && it.resolve("options").isDirectory() }
+        .sortedWith(compareByDescending<Path> { it.name.startsWith("IntelliJIdea") || it.name.startsWith("IdeaIC") }.thenByDescending { it.name })
+    for (ide in ides) {
         val colors = ide.resolve("colors")
         if (!colors.isDirectory()) continue
         val current = runCatching {
@@ -94,20 +83,6 @@ private fun editorFont(file: Path): CodeFont? {
         ligatures = options["USE_LIGATURES"] == "true",
     )
 }
-
-/** The person's VS Code settings.json, where there is one. */
-private fun vsCodeSettings(): Path? = listOfNotNull(
-    System.getenv("APPDATA")?.let { Path.of(it, "Code", "User", "settings.json") },
-    Path.of(System.getProperty("user.home"), "Library", "Application Support", "Code", "User", "settings.json"),
-    Path.of(System.getProperty("user.home"), ".config", "Code", "User", "settings.json"),
-).firstOrNull { it.exists() }
-
-/** Every colour theme the person's VS Code has, by label. */
-private fun vsCodeThemeNames(): List<String> = vsCodeThemeFolders().flatMap { folder ->
-    folder.resolve("package.json").takeIf { it.exists() }
-        ?.let { runCatching { VsCodeThemes.themeEntries(readJson(it.readText()) as Map<*, *>, nlsOf(folder)).map { entry -> entry.label } }.getOrNull() }
-        .orEmpty()
-}.distinct()
 
 private fun nlsOf(folder: Path): Map<*, *>? =
     folder.resolve("package.nls.json").takeIf { it.exists() }?.let { runCatching { readJson(it.readText()) as? Map<*, *> }.getOrNull() }

@@ -1,0 +1,303 @@
+// Matcha: Leaf, less vibrant. Made from Leaf by keeping each green's hue and lightness and halving its
+// saturation (greens: hues 75-195 degrees); its greys and the red of unused names stay as they are.
+"workbench.colorCustomizations": {
+  // Activity Bar (Sidebar)
+  "activityBar.activeBorder": "#7aa388",
+  "activityBar.foreground": "#7aa388",
+  "activityBarBadge.background": "#7aa388",
+  "activityBarBadge.foreground": "#ffffff",
+  // Tab Bar
+  "tab.activeBorderTop": "#7aa388",
+  // Remove focus border globally
+  "focusBorder": "#00000000",
+  // Git decorations (changed/untracked files in Explorer)
+  // "gitDecoration.modifiedResourceForeground": "#7aa388",
+  // "gitDecoration.untrackedResourceForeground": "#a0cca9",
+  // "gitDecoration.renamedResourceForeground": "#7aa388",
+  // "gitDecoration.stageModifiedResourceForeground": "#5a7e63",
+  // "gitDecoration.conflictingResourceForeground": "#eebc87"
+},
+
+"python.analysis.typeCheckingMode": "standard",
+"editor.bracketPairColorization.enabled": false,
+"editor.guides.bracketPairs": false,
+"editor.fontFamily": "Source Code Pro, Fira Code, Menlo, Monaco, 'Courier New', monospace",
+"editor.fontLigatures": true,
+"editor.fontSize": 13,
+"editor.lineHeight": 1.4,
+
+"editor.semanticTokenColorCustomizations": {
+  "rules": {
+    "variable.unused": "#ff0000",
+    "parameter.unused": "#ff0000",
+    // Imports/modules/namespaces as base color:
+    "namespace": {
+      "foreground": "#dddddd",
+      "fontStyle": "bold"
+    },
+    "variable.readonly": {
+      "foreground": "#dddddd",
+      "fontStyle": "underline"
+    },
+    // UPDATED: variable.declaration, variable.local
+    "variable.declaration": {
+      "foreground": "#a0cca9",
+      "fontStyle": "bold"
+    },
+    "variable": "#dddddd",
+    "variable.local": "#a0cca9",
+    "parameter": "#bdd0bf", // pale, soft green for params
+    "property": "#5a7e63",
+    "function": "#dddddd",
+    "function.defaultLibrary": {
+      "foreground": "#dddddd",
+      "fontStyle": "italic"
+    },
+    "class": "#7aa388",
+    "keyword": "#659675",
+    "operator": "#dddddd",
+    "number": "#7da497", // blue-green for numbers
+    "string": "#719f82",
+    "comment": {
+      "foreground": "#6e847a",
+      "fontStyle": "italic"
+    },
+    "macro": "#90bba3",
+    "parameter.label": "#467cda"
+  }
+},
+
+"editor.tokenColorCustomizations": {
+  "textMateRules": [
+    // Comments: italic, muted green-gray
+    {
+      "scope": [
+        "comment",
+        "comment.line",
+        "comment.block",
+        "comment.documentation",
+        "punctuation.definition.comment.python"
+      ],
+      "settings": {
+        "foreground": "#6e847a",
+        "fontStyle": "italic"
+      }
+    },
+    // Keywords: bold green, not bold
+    {
+      "scope": [
+        "keyword",
+        "storage.type",
+        "storage.modifier",
+        "keyword.control",
+        "keyword.operator",
+        "keyword.other",
+        "keyword.control.import.python",
+        "keyword.control.from.python",
+        "keyword.operator.logical.python",
+        "keyword.operator.word.python",
+        "constant.language",
+        "constant.language.python",
+        "support.constant"
+      ],
+      "settings": {
+        "foreground": "#659675",
+        "fontStyle": ""
+      }
+    },
+    // Operators: base color
+    {
+      "scope": [
+        "keyword.operator",
+        "keyword.operator.assignment",
+        "keyword.operator.arithmetic",
+        "keyword.operator.comparison",
+        "keyword.operator.logical",
+        "punctuation.separator",
+        "punctuation.terminator"
+      ],
+      "settings": {
+        "foreground": "#dddddd",
+        "fontStyle": ""
+      }
+    },
+    // Module/package names in imports: base color
+    {
+      "scope": [
+        "meta.import.python variable.other.readwrite",
+        "meta.import variable.other.readwrite",
+        "meta.import.python support.identifier",
+        "meta.import support.identifier",
+        "entity.name.namespace.python",
+        "meta.module-name.python",
+        "meta.import variable"
+      ],
+      "settings": {
+        "foreground": "#dddddd"
+      }
+    },
+    // Brackets, braces, parentheses: base color
+    {
+      "scope": [
+        "punctuation.section.brackets",
+        "punctuation.section.braces",
+        "punctuation.section.parens",
+        "punctuation.definition.parameters.begin.python",
+        "punctuation.definition.parameters.end.python",
+        "punctuation.definition.arguments.begin.python",
+        "punctuation.definition.arguments.end.python",
+        "punctuation.definition.list.begin.python",
+        "punctuation.definition.list.end.python",
+        "meta.brace.round.python",
+        "meta.brace.square.python",
+        "meta.brace.curly.python",
+        "meta.brace",
+        "meta.bracket",
+        "meta.parenthesis",
+        "punctuation",
+        "punctuation.definition"
+      ],
+      "settings": {
+        "foreground": "#dddddd"
+      }
+    },
+    // Named parameters in function calls: blue
+    {
+      "scope": [
+        "variable.parameter.named",
+        "meta.function-call.arguments.python variable.parameter",
+        "meta.function-call.python variable.parameter",
+        "meta.function-call keyword.parameter.name.python",
+        "meta.function-call.arguments.python keyword.parameter.name.python",
+        "meta.function-call.arguments.python variable.parameter.function.python"
+      ],
+      "settings": {
+        "foreground": "#467CDA",
+        "fontStyle": ""
+      }
+    },
+    // Local variables: lighter green
+    {
+      "scope": [
+        "variable.other.local",
+        "variable.other.readwrite"
+      ],
+      "settings": {
+        "foreground": "#a0cca9"
+      }
+    },
+    // ALL other variables: base color
+    {
+      "scope": [
+        "variable.other"
+      ],
+      "settings": {
+        "foreground": "#dddddd"
+      }
+    },
+    // Parameters (arg names): soft pale green
+    {
+      "scope": [
+        "variable.parameter",
+        "meta.function.parameters.python"
+      ],
+      "settings": {
+        "foreground": "#bdd0bf"
+      }
+    },
+    // Function name in definition: base color (non-italic)
+    {
+      "scope": [
+        "entity.name.function"
+      ],
+      "settings": {
+        "foreground": "#dddddd"
+      }
+    },
+    // Class name in definition: accent green (non-italic)
+    {
+      "scope": [
+        "entity.name.class"
+      ],
+      "settings": {
+        "foreground": "#7aa388"
+      }
+    },
+    // Function calls: italic, base color
+    {
+      "scope": [
+        "meta.function-call.python",
+        "meta.function-call.arguments.python",
+        "variable.function",
+        "variable.annotation"
+      ],
+      "settings": {
+        "foreground": "#dddddd",
+        "fontStyle": "italic"
+      }
+    },
+    // Member variables (attributes): deep green
+    {
+      "scope": [
+        "variable.other.property.python",
+        "variable.other.member",
+        "meta.attribute.python"
+      ],
+      "settings": {
+        "foreground": "#5a7e63"
+      }
+    },
+    // Static methods, built-ins: light mint green
+    {
+      "scope": [
+        "support.function",
+        "meta.function.static.python",
+        "support.function.builtin"
+      ],
+      "settings": {
+        "foreground": "#90bba3"
+      }
+    },
+    // Strings: leafy green
+    {
+      "scope": [
+        "string",
+        "string.quoted",
+        "string.quoted.single",
+        "string.quoted.double",
+        "string.interpolated",
+        "punctuation.definition.string.begin.python",
+        "punctuation.definition.string.end.python"
+      ],
+      "settings": {
+        "foreground": "#719f82",
+        "fontStyle": ""
+      }
+    },
+    // Numbers: blue-green
+    {
+      "scope": [
+        "constant.numeric"
+      ],
+      "settings": {
+        "foreground": "#7da497"
+      }
+    },
+    // Decorators/metadata: mint
+    {
+      "scope": [
+        "meta.decorator.python"
+      ],
+      "settings": {
+        "foreground": "#90bba3"
+      }
+    },
+    // Default Python text: base color (fallback)
+    {
+      "scope": "source.python",
+      "settings": {
+        "foreground": "#dddddd"
+      }
+    }
+  ]
+}

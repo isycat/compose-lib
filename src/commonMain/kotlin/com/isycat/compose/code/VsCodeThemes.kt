@@ -283,15 +283,6 @@ object VsCodeThemes {
         return VsCodeTheme.read(text, file) { files[it] }.asContributed(entry)
     }
 
-    /**
-     * One Dark Pro (Binaryify, MIT), bundled: the most installed open-source dark theme. [nightFlat] gives its Night
-     * Flat variant (background #16191d).
-     */
-    suspend fun oneDarkPro(nightFlat: Boolean = false): VsCodeTheme {
-        val file = if (nightFlat) "OneDark-Pro-night-flat.json" else "OneDark-Pro.json"
-        return VsCodeTheme.read(bundledText(file), file)
-    }
-
     /** A theme an extension's manifest brings: its id, label, VS Code's type for it, and its file. */
     class ThemeEntry(val id: String?, val label: String, val uiTheme: String, val path: String) {
         fun matches(name: String) = name.equals(label, ignoreCase = true) || name.equals(id, ignoreCase = true)

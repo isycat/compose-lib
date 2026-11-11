@@ -3,11 +3,21 @@ Colour themes bundled with compose-lib's code themes, as moonshine-ide carries t
   2026-*.json, dark_*.json, light_*.json, hc_*.json, package.json, package.nls.json
       Visual Studio Code's default colour themes (its theme-defaults extension), MIT,
       Copyright (c) Microsoft Corporation; the licence is below.
-  OneDark-Pro.json, OneDark-Pro-night-flat.json
-      One Dark Pro and its Night Flat variant, 75c80ab (Binaryify/OneDark-Pro), MIT,
-      Copyright (c) 2013-2022 Binaryify; the licence is OneDark-Pro.LICENSE.txt.
-  Darcula.xml, Darcula_Kotlin.xml, Default.xml, Markdown*.xml, YAMLDarcula.xml
+  OneDark-Pro.json
+      One Dark Pro, 75c80ab (Binaryify/OneDark-Pro), MIT, Copyright (c) 2013-2022 Binaryify; the licence is
+      OneDark-Pro.LICENSE.txt.
+  GitHub-dark-default.json
+      GitHub Dark Default, GitHub Theme 6.3.5 (primer/github-vscode-theme), MIT, Copyright (c) 2020 Primer; the licence
+      is GitHub.LICENSE.txt.
+  Dracula.json
+      Dracula, 2.25.1 (dracula/visual-studio-code), MIT, Copyright (c) 2016 Dracula Theme; the licence is
+      Dracula.LICENSE.txt.
+  Ayu-dark.json
+      Ayu Dark, 1.5.0 (ayu-theme/vscode-ayu), MIT, Copyright (c) 2016 Ike Kurghinyan; the licence is Ayu.LICENSE.txt.
+  Darcula*.xml, Default*.xml, IslandsDark.xml, IntelliJComposeColorScheme*.xml, Markdown*.xml, YAMLDarcula.xml
       IntelliJ IDEA's colour schemes, Apache License 2.0; see NOTICE.txt and Apache-2.0.txt.
+  green.vscode-settings.jsonc, matcha.vscode-settings.jsonc, isycat.vscode-settings.jsonc, isycat.icls
+      Leaf, Matcha, isycat VS Code and isycat, moonshine's own themes.
 
 ---------------------------------------------------------
 microsoft/vscode (extensions/theme-defaults) - MIT

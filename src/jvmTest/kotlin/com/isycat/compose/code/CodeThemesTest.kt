@@ -12,27 +12,70 @@ class CodeThemesTest {
     private fun color(hex: String) = checkNotNull(colorOf(hex))
 
     @Test
-    fun theDefaultIsOneDarkProNightFlatColouringKotlinAsVsCodeDoes() = runBlocking {
-        val theme = CodeThemes.builtIn.first().load()
+    fun theThemesAreMoonshinesWithTheirNamesAndSources() {
+        assertEquals(
+            listOf(
+                "GitHub Dark Default", "One Dark Pro", "Dracula", "Ayu Dark", "moonshine Dark", "Islands Dark", "Dark 2026",
+                "Leaf", "Matcha", "isycat", "isycat VS Code",
+            ),
+            CodeThemes.builtIn.map { it.label },
+        )
+        assertEquals("IntelliJ IDEA's default", CodeThemes.builtIn.single { it.label == "Islands Dark" }.detail)
         assertEquals(CodeThemes.DEFAULT_ID, CodeThemes.builtIn.first().id)
-        assertEquals(color("#16191d"), theme.palette.background)
-        assertEquals(color("#c678dd"), theme.style(KotlinKeys.CONTROL_KEYWORD).foreground)
-        assertEquals(color("#d19a66"), theme.style(KotlinKeys.NUMBER).foreground)
-        assertEquals(color("#98c379"), theme.style(KotlinKeys.STRING).foreground)
-        assertEquals(color("#7f848e"), theme.style(KotlinKeys.LINE_COMMENT).foreground)
-        assertEquals(color("#61afef"), theme.style(KotlinKeys.FUNCTION_CALL).foreground)
-        assertEquals(color("#e5c07b"), theme.style(KotlinKeys.PACKAGE_PROPERTY).foreground)
-        assertEquals(color("#abb2bf"), theme.style(KotlinKeys.IDENTIFIER).foreground, "a plain name in the editor's colour")
+        assertEquals(CodeThemes.builtIn.map { it.id }.distinct(), CodeThemes.builtIn.map { it.id })
     }
 
     @Test
-    fun everyBuiltInThemeLoads() = runBlocking {
-        assertEquals(listOf("One Dark Pro Night Flat", "One Dark Pro", "moonshine Dark", "Darcula"), CodeThemes.builtIn.map { it.label })
+    fun everyBuiltInThemeLoadsDarkAndColoursKotlin() = runBlocking {
         CodeThemes.builtIn.forEach { choice ->
             val theme = choice.load()
             assertTrue(theme.dark, choice.label)
             assertTrue(theme.style(KotlinKeys.KEYWORD).foreground != null, "${choice.label} colours keywords")
+            assertTrue(theme.style(KotlinKeys.STRING).foreground != theme.style(KotlinKeys.KEYWORD).foreground, "${choice.label} tells strings from keywords")
         }
+    }
+
+    @Test
+    fun gitHubDarkDefaultColoursKotlinAsVsCodeDoes() = runBlocking {
+        val theme = CodeThemes.builtIn.first().load()
+        assertEquals(color("#0d1117"), theme.palette.background)
+        assertEquals(color("#ff7b72"), theme.style(KotlinKeys.CONTROL_KEYWORD).foreground)
+    }
+
+    @Test
+    fun isycatIsTheBundledSchemeOnDarculaInSourceCodePro() = runBlocking {
+        val theme = CodeThemes.builtIn.single { it.id == CodeThemes.ISYCAT_ID }.load()
+        assertEquals("isycat", theme.name)
+        assertEquals(Color(0xFF131212), theme.palette.background)
+        assertEquals(Color(0xFFBA7ACC), theme.style(KotlinKeys.KEYWORD).foreground, "Kotlin's keywords as Java's, as IntelliJ inherits them")
+        assertEquals(Color(0xFF9A74B1), theme.style(DefaultKeys.KEYWORD).foreground)
+        assertTrue(theme.style(DefaultKeys.KEYWORD).bold)
+        assertEquals("Source Code Pro", theme.font?.families?.first())
+    }
+
+    @Test
+    fun islandsDarkIsIntellijsDefaultDarkScheme() = runBlocking {
+        val theme = JetBrainsSchemes.islandsDark()
+        assertEquals("Islands Dark", theme.name)
+        assertEquals(Color(0xFF191A1C), theme.palette.background)
+        assertEquals(Color(0xFFBCBEC4), theme.palette.foreground)
+    }
+
+    @Test
+    fun choicesKeptFromTheEarlierSetAreCarriedOver() {
+        val default = CodeThemes.ISYCAT_ID
+        assertEquals("moonshine:one-dark-pro", CodeThemes.carriedOver("moonshine:one-dark-pro-night-flat", default))
+        assertEquals("jetbrains:Islands Dark", CodeThemes.carriedOver("jetbrains:Darcula", default))
+        assertEquals("vscode-default:Dark 2026", CodeThemes.carriedOver("vscode:Dark 2026", default))
+        assertEquals(CodeThemes.ISYCAT_ID, CodeThemes.carriedOver("""jetbrains:C:\Users\a\JetBrains\Rider2025.3\colors\isycat.icls""", "x"))
+        assertEquals(CodeThemes.ISYCAT_ID, CodeThemes.carriedOver("jetbrains:/home/a/.config/JetBrains/IntelliJIdea2025.3/colors/isycat.icls", "x"))
+        val mine = """jetbrains:C:\JetBrains\IntelliJIdea2025.3\colors\mine.icls"""
+        assertEquals(mine, CodeThemes.carriedOver(mine, "x"))
+        assertEquals(default, CodeThemes.carriedOver("vscode:Monokai", default))
+        assertEquals(default, CodeThemes.carriedOver("""vscode-settings:C:\Users\a\settings.json""", default))
+        assertEquals("moonshine:dark", CodeThemes.carriedOver("moonshine:dark", default))
+        assertEquals("imported:mine.icls", CodeThemes.carriedOver("imported:mine.icls", default))
+        CodeThemes.builtIn.forEach { assertEquals(it.id, CodeThemes.carriedOver(it.id, default)) }
     }
 
     @Test
