@@ -304,13 +304,16 @@ class TabbedTitleBarTest {
         onNodeWithTag(TitleBarTags.NEW_TAB).assertExists()
     }
 
-    // Four long tabs at phone width, the last one in front, so the first ones are scrolled out of sight.
-    private fun ComposeUiTest.phoneBar(moves: MutableList<Pair<Int, Int>>) {
-        val tabs = longTabs.take(4)
+    // Long tabs (four by default) at phone width, the last one in front, so the first ones are scrolled out of sight.
+    private fun ComposeUiTest.phoneBar(
+        moves: MutableList<Pair<Int, Int>>,
+        count: Int = 4,
+    ) {
+        val tabs = longTabs.take(count)
         setContent {
             MaterialTheme {
                 Box(Modifier.width(PHONE)) {
-                    TabbedTitleBar(tabs, 3, {}, onNewTab = {}, onMoveTab = { from, to -> moves += from to to })
+                    TabbedTitleBar(tabs, tabs.lastIndex, {}, onNewTab = {}, onMoveTab = { from, to -> moves += from to to })
                 }
             }
         }
@@ -350,10 +353,12 @@ class TabbedTitleBarTest {
     /** Web gate 2026-11-11: one notch jumped the whole strip, then moved only a quarter of a tab. One notch moves one tab. */
     @Test
     fun oneWheelNotchStepsAboutOneTab() = runComposeUiTest {
-        phoneBar(mutableListOf())
+        // Five tabs, so the strip is scrolled more than one tab from its start and the notch isn't stopped there.
+        phoneBar(mutableListOf(), count = 5)
         val first = longTabs.first().title
         val before = leftOf(first)
-        onNodeWithText(longTabs[3].title).performMouseInput {
+        assertTrue(before < -MinTabWidth, "The strip isn't scrolled more than one tab from its start: $before")
+        onNodeWithText(longTabs[4].title).performMouseInput {
             moveTo(center)
             scroll(-1f)
         }
