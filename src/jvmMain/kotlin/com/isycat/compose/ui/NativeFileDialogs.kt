@@ -65,27 +65,30 @@ object NativeFileDialogs {
     }
 
     /**
-     * Asks where to save a file of type [filter], suggesting [fileName] in [directory]. The filter's first extension is
-     * added when the name has none, and Windows asks before overwriting. Returns null when cancelled.
+     * Asks where to save a file of type [filter], or of one of the types [alsoAs] where the dialog lets the user choose
+     * (Windows's "Save as type"), suggesting [fileName] in [directory]. The chosen type's first extension is added when
+     * the name has none of its own, so the type is read from the file's extension; Windows asks before overwriting.
+     * Returns null when cancelled.
      */
     suspend fun saveFile(
         owner: Window?,
         title: String,
         directory: File? = null,
         fileName: String? = null,
-        filter: FileTypeFilter? = null
+        filter: FileTypeFilter? = null,
+        alsoAs: List<FileTypeFilter> = emptyList()
     ): File? {
-        val extension = filter?.extensions?.firstOrNull()
+        val types = listOfNotNull(filter) + alsoAs
         if (isWindows) {
             val options = WindowsFileDialog.FOS_OVERWRITEPROMPT or WindowsFileDialog.FOS_PATHMUSTEXIST
             explorer(
                 save = true, handleOf(owner), title, directory, options,
                 setup = {
-                    if (filter != null) setFileTypes(listOf(filter.name to filter.pattern))
-                    extension?.let(::setDefaultExtension)
+                    setFileTypes(types.map { it.name to it.pattern })
+                    types.firstOrNull()?.extensions?.firstOrNull()?.let(::setDefaultExtension)
                     fileName?.let { this.fileName = it }
                 },
-                read = { result() }
+                read = { result()?.let { file -> ofType(file, types.getOrNull(fileTypeIndex - 1), types) } }
             )?.let { return it.value }
         }
         return withContext(Dispatchers.Swing) {
@@ -93,9 +96,17 @@ object NativeFileDialogs {
             directory?.let { dialog.directory = it.absolutePath }
             fileName?.let { dialog.file = it }
             dialog.isVisible = true
-            val picked = dialog.files.firstOrNull() ?: return@withContext null
-            if (extension == null || filter.accepts(picked)) picked else File(picked.parentFile, "${picked.name}.$extension")
+            dialog.files.firstOrNull()?.let { ofType(it, filter, types) }
         }
+    }
+
+    /**
+     * [file] named for type [chosen]: as it is where it already ends in one of [types]' extensions, the name the user
+     * typed being theirs, and with [chosen]'s first extension added otherwise.
+     */
+    internal fun ofType(file: File, chosen: FileTypeFilter?, types: List<FileTypeFilter>): File {
+        val extension = chosen?.extensions?.firstOrNull() ?: return file
+        return if (types.any { it.accepts(file) }) file else File(file.parentFile, "${file.name}.$extension")
     }
 
     /** Asks for a folder, starting in [directory]. [okLabel] replaces "Select Folder" where the platform allows. */

@@ -96,6 +96,9 @@ internal object WindowsFileDialog {
             com.check(5, "SetFileTypeIndex", 1)
         }
 
+        /** Which of the types [setFileTypes] gave is chosen, counting from 1, as the user left it. */
+        val fileTypeIndex: Int get() = IntByReference().also { com.check(6, "GetFileTypeIndex", it) }.value
+
         var options: Int
             get() = IntByReference().also { com.check(10, "GetOptions", it) }.value
             set(value) = com.check(9, "SetOptions", value)
