@@ -43,6 +43,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -432,6 +433,8 @@ fun TabbedTitleBar(
                     val scroll = rememberScrollState()
                     // Where the tab in front is in the strip, so that when the tabs scroll it's kept in view.
                     var front by remember { mutableStateOf<IntRange?>(null) }
+                    // How wide a tab is laid out, in the strip's own pixels: how far one notch of a mouse wheel moves it.
+                    val tabWidth = remember { mutableIntStateOf(0) }
                     LaunchedEffect(front, room) {
                         val span = front ?: return@LaunchedEffect
                         when {
@@ -440,9 +443,9 @@ fun TabbedTitleBar(
                         }
                     }
                     // A touch swipes the tabs along (a long press then drags one); a mouse wheel scrolls them too.
-                    Box(Modifier.fillMaxHeight().wheelScrollsSideways(scroll, tabMinWidth).horizontalScroll(scroll)) {
+                    Box(Modifier.fillMaxHeight().wheelScrollsSideways(scroll) { tabWidth.intValue }.horizontalScroll(scroll)) {
                         val drag = rememberTabDrag(tabs, onMoveTab, onTabSelected)
-                        TabStrip(room, tabMinWidth, selectedTabIndex, { front = it }, Modifier.fillMaxHeight().testTag(TitleBarTags.TABS)) {
+                        TabStrip(room, tabMinWidth, selectedTabIndex, { front = it }, { tabWidth.intValue = it }, Modifier.fillMaxHeight().testTag(TitleBarTags.TABS)) {
                             tabs.forEachIndexed { index, tab ->
                                 key(tab.key) {
                                     bar.DocumentTab(tab, index == selectedTabIndex, drag?.modifier(tab.key) ?: Modifier) {
@@ -499,6 +502,7 @@ private fun TabStrip(
     minWidth: Dp,
     front: Int,
     onFront: (IntRange?) -> Unit,
+    onTabWidth: (Int) -> Unit,
     modifier: Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -519,6 +523,7 @@ private fun TabStrip(
                 x += placeable.width
             }
             onFront(span)
+            onTabWidth(placeables.maxOfOrNull { it.width } ?: 0)
         }
     }
 }
@@ -665,11 +670,12 @@ private fun rememberTabDrag(tabs: List<TitleBarTab>, onMoveTab: ((Int, Int) -> U
 
 /**
  * A mouse wheel turned over a strip that scrolls sideways scrolls it, as a wheel does over a browser's tabs: a mouse
- * has no sideways wheel, and Compose only scrolls a row with one (or with Shift held). One notch moves it [step], the
- * width of a tab cut to fit. A sideways wheel or touchpad swipe is left to the row's own scrolling.
+ * has no sideways wheel, and Compose only scrolls a row with one (or with Shift held). One notch moves it [step] pixels,
+ * the width of a tab as laid out, so it's in the same pixels as the scrolling whatever the screen's density. A sideways
+ * wheel or touchpad swipe is left to the row's own scrolling.
  */
-private fun Modifier.wheelScrollsSideways(scroll: ScrollState, step: Dp): Modifier =
-    pointerInput(scroll, step) {
+private fun Modifier.wheelScrollsSideways(scroll: ScrollState, step: () -> Int): Modifier =
+    pointerInput(scroll) {
         listenForWheelNotches()
         awaitPointerEventScope {
             while (true) {
@@ -681,7 +687,7 @@ private fun Modifier.wheelScrollsSideways(scroll: ScrollState, step: Dp): Modifi
                 val delta = change.scrollDelta
                 if (abs(delta.y) <= abs(delta.x) || scroll.maxValue == 0) continue
                 // In notches, not the browser's pixels: a notch steps one tab, wherever the bar runs.
-                scroll.dispatchRawDelta(event.wheelNotches() * step.toPx())
+                scroll.dispatchRawDelta(event.wheelNotches() * step())
                 change.consume()
             }
         }

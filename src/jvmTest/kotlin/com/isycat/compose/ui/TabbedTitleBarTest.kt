@@ -352,7 +352,13 @@ class TabbedTitleBarTest {
 
     /** Web gate 2026-11-11: one notch jumped the whole strip, then moved only a quarter of a tab. One notch moves one tab. */
     @Test
-    fun oneWheelNotchStepsAboutOneTab() = runComposeUiTest {
+    fun oneWheelNotchStepsAboutOneTab() = runComposeUiTest { oneNotchMovesOneTab() }
+
+    /** Web gate 2026-11-11: on a screen of density 2 one notch moved half a tab. It moves one tab at any density. */
+    @Test
+    fun oneWheelNotchStepsOneTabAtDensityTwo() = runSkikoComposeUiTest(density = Density(2f)) { oneNotchMovesOneTab() }
+
+    private fun ComposeUiTest.oneNotchMovesOneTab() {
         // Five tabs, so the strip is scrolled more than one tab from its start and the notch isn't stopped there.
         phoneBar(mutableListOf(), count = 5)
         val first = longTabs.first().title
