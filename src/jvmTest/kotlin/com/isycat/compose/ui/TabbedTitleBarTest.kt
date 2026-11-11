@@ -325,7 +325,11 @@ class TabbedTitleBarTest {
         val first = longTabs.first().title
         val before = leftOf(first)
         assertTrue(before < 0.dp, "The first tab isn't scrolled out of sight to start with: $before")
-        onNodeWithTag(TitleBarTags.TABS).performMouseInput { scroll(-20f) }
+        // Over the tab in front, which is in view; the strip's own corner is scrolled out of it.
+        onNodeWithText(longTabs[3].title).performMouseInput {
+            moveTo(center)
+            scroll(-20f)
+        }
         waitForIdle()
         assertTrue(leftOf(first) >= 0.dp, "The wheel didn't bring the first tab back: ${leftOf(first)}")
     }

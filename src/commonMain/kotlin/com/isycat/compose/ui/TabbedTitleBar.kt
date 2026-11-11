@@ -608,8 +608,9 @@ private class TabDrag(
                             }
                         } ?: return@awaitEachGesture
                     horizontalDrag(dragging.id) { change ->
-                        change.consume()
+                        // Read before consuming: a consumed change reports no movement.
                         move(key, change.positionChange().x)
+                        change.consume()
                     }
                     stop()
                 }
