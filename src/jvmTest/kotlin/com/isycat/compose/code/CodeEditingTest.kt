@@ -107,6 +107,16 @@ class CodeEditingTest {
     }
 
     @Test
+    fun copyingWithNothingSelectedTakesTheLineAndPastesItAsALine() {
+        assertEquals(TextRange(2, 6), editing.wholeLine(at("a\nb|cd\ne")), "the line and its break")
+        assertEquals(TextRange(2, 4), editing.wholeLine(at("a\nb|c")), "the last line, which has none")
+        assertNull(editing.wholeLine(at("a\n[bc]")), "a selection is taken as it is")
+        assertEquals("a\nbcd\nb|cd", shown(editing.pasteLine(at("a\nb|cd"), "bcd\n")), "in above the caret's line")
+        assertEquals("x\nab|c", shown(editing.pasteLine(at("ab|c"), "x")), "a last line gets its break")
+        assertNull(editing.pasteLine(at("[ab]c"), "x\n"))
+    }
+
+    @Test
     fun homeGoesToTheFirstCharacterThenTheLinesStart() {
         assertEquals("    |val a", shown(editing.home(at("    val |a"), extend = false)))
         assertEquals("|    val a", shown(editing.home(at("    |val a"), extend = false)))

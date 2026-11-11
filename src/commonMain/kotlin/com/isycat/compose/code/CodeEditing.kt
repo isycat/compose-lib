@@ -26,7 +26,8 @@ class Literals(val strings: List<IntRange> = emptyList(), val comments: List<Int
  * bracket; Backspace in a line's indent steps back to the indent stop before, and between a pair takes both; Tab and
  * Shift+Tab indent and outdent the lines a selection touches, Tab with no lines selected steps on to the next stop;
  * Ctrl+/ comments lines out and in; lines duplicate, go and move up and down; Home goes to the first character that is
- * not a space, then to the line's start. Each returns the text and selection after, or null where it does nothing and
+ * not a space, then to the line's start; copying or cutting with nothing selected takes the caret's line, which pastes
+ * back in as a line. Each returns the text and selection after, or null where it does nothing and
  * the key is left to the text field.
  */
 class CodeEditing(
@@ -199,6 +200,28 @@ class CodeEditing(
             val shift = previous.length + 1
             TextFieldValue(text.replaceRange(previousStart, to, "$block\n$previous"), TextRange(value.selection.start - shift, value.selection.end - shift))
         }
+    }
+
+    /**
+     * Ctrl+C and Ctrl+X with nothing selected: the caret's whole line, its line break with it, selected, for the copy
+     * or cut to take; null where something is selected, which they take as it is.
+     */
+    fun wholeLine(value: TextFieldValue): TextRange? {
+        if (!value.selection.collapsed) return null
+        val text = value.text
+        val caret = value.selection.start
+        return TextRange(lineStart(text, caret), (lineEnd(text, caret) + 1).coerceAtMost(text.length))
+    }
+
+    /**
+     * [line], as copied or cut whole with nothing selected, pasted with nothing selected: in above the caret's line, as a
+     * line of its own, the caret where it was on its line; null where something is selected, which a paste replaces.
+     */
+    fun pasteLine(value: TextFieldValue, line: String): TextFieldValue? {
+        if (!value.selection.collapsed) return null
+        val whole = if (line.endsWith('\n')) line else "$line\n"
+        val caret = value.selection.start
+        return TextFieldValue(value.text.replaceRange(lineStart(value.text, caret), lineStart(value.text, caret), whole), TextRange(caret + whole.length))
     }
 
     /** Home: to the line's first character that is not a space, or from there to the line's start; [extend] selects. */
