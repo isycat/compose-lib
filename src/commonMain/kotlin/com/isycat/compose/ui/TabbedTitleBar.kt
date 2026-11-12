@@ -105,7 +105,8 @@ import kotlin.math.roundToInt
  * colour as `LocalContentColor`) and a [tooltip], such as the file's path. An unsaved one ([dirty]) wears a dot at its
  * end until the pointer is on it. [onClose] gives it a close button there, shown while the tab is in front or the
  * pointer is on it, and a middle-click closes it too; neither when null. [key] keeps each tab's hover with it as tabs
- * come and go.
+ * come and go. An [iconOnly] tab shows just its icon, as narrow as that, with its [title] kept for its tooltip and as
+ * what it is named to accessibility; it has no end for a dot or a close button.
  */
 class TitleBarTab(
     val title: String,
@@ -114,6 +115,7 @@ class TitleBarTab(
     val dirty: Boolean = false,
     val onClose: (() -> Unit)? = null,
     val key: Any = title,
+    val iconOnly: Boolean = false,
 )
 
 /**
@@ -756,7 +758,8 @@ private class Bar(
                     .selectable(selected, interaction, indication = null, role = Role.Tab, onClick = onSelect)
                     // Inside the selectable, so it takes a middle-click before the tab would.
                     .then(tab.onClose?.let { Modifier.closesOnMiddleClick(it) } ?: Modifier)
-                    .padding(start = 12.dp, end = 6.dp),
+                    .padding(start = 12.dp, end = if (tab.iconOnly) 14.dp else 6.dp)
+                    .then(if (tab.iconOnly) Modifier.semantics { contentDescription = tab.title } else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.width(2.dp).height(16.dp).background(if (selected) colors.accent else Color.Transparent))
@@ -767,6 +770,7 @@ private class Bar(
                     }
                     Spacer(Modifier.width(7.dp))
                 }
+                if (tab.iconOnly) return@Row
                 RowLabel(tab.title, typography.tab, if (selected) colors.selectedTabContent else colors.tab, Modifier.widthIn(max = tabTitleMaxWidth))
                 Spacer(Modifier.width(4.dp))
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
