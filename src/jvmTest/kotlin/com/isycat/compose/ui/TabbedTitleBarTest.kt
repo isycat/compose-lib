@@ -120,6 +120,17 @@ class TabbedTitleBarTest {
         onNodeWithText("Bush.msplant").assertExists()
     }
 
+    @Test
+    fun anIconOnlyTabShowsItsIconAloneNamedByItsTitle() = runComposeUiTest {
+        val home = TitleBarTab("Start", icon = { Text("H") }, iconOnly = true)
+        setContent { MaterialTheme { TabbedTitleBar(listOf(home) + tabs, 0, {}) } }
+
+        onNodeWithText("Start").assertDoesNotExist()
+        val tab = onNodeWithContentDescription("Start")
+        tab.assertExists()
+        tab.assertWidthIsEqualTo(56.dp)
+    }
+
     private fun SemanticsNodeInteraction.middleClick() =
         performMouseInput {
             moveTo(center)
