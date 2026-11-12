@@ -27,7 +27,8 @@ data class Carets(val text: String, val selections: List<TextRange>) {
 /**
  * What a code editor's keys do with several carets, as moonshine's editor and JetBrains IDEs do them: Alt+J selects the
  * word at the caret, then each next place the selection's text stands; Alt+Shift+J takes the last one away;
- * Ctrl+Alt+Shift+J selects every place; an edit is made at every caret.
+ * Ctrl+Alt+Shift+J selects every place; an edit is made at every caret; copying takes each selection's text, which
+ * pastes back a piece at each.
  */
 object CodeCarets {
     /**
@@ -69,12 +70,46 @@ object CodeCarets {
      * stands; each selection after it moves with what it put in or took out. Where [edit] is null for a selection, it is
      * left as it is. Selections that come to cover the same text become one.
      */
-    fun editEach(carets: Carets, edit: (TextFieldValue) -> TextFieldValue?): Carets {
+    fun editEach(carets: Carets, edit: (TextFieldValue) -> TextFieldValue?): Carets = editEachIndexed(carets) { _, value -> edit(value) }
+
+    /**
+     * Copying with several selections: what each takes, in the text's order: its text, or a caret's whole line, its line
+     * break left out. They go to the clipboard a line each.
+     */
+    fun copied(carets: Carets): List<String> = carets.selections.sortedBy { it.min }.map { selection ->
+        val range = if (selection.collapsed) lineRange(carets.text, selection.start, withBreak = false) else selection
+        carets.text.substring(range.min, range.max)
+    }
+
+    /** Cutting with several selections: each one's text, or a caret's whole line with its break, taken out. */
+    fun cut(carets: Carets): Carets = editEach(carets) { value ->
+        val range = if (value.selection.collapsed) lineRange(value.text, value.selection.start, withBreak = true) else value.selection
+        CodeEditing.replaced(value.text, range.min, range.max, "")
+    }
+
+    /**
+     * Pasting what several selections copied ([copied]) at as many: each its own piece, in the text's order; null where
+     * the counts differ, and the whole goes in at each.
+     */
+    fun pasteEach(carets: Carets, pieces: List<String>): Carets? {
+        if (pieces.size != carets.selections.size) return null
+        val rank = carets.selections.indices.sortedBy { carets.selections[it].min }
+        return editEachIndexed(carets) { index, value ->
+            CodeEditing.replaced(value.text, value.selection.min, value.selection.max, pieces[rank.indexOf(index)])
+        }
+    }
+
+    private fun lineRange(text: String, offset: Int, withBreak: Boolean): TextRange {
+        val end = CodeEditing.lineEnd(text, offset)
+        return TextRange(CodeEditing.lineStart(text, offset), if (withBreak) (end + 1).coerceAtMost(text.length) else end)
+    }
+
+    private fun editEachIndexed(carets: Carets, edit: (Int, TextFieldValue) -> TextFieldValue?): Carets {
         val order = carets.selections.indices.sortedByDescending { carets.selections[it].min }
         var text = carets.text
         val after = carets.selections.toMutableList()
         for (index in order) {
-            val made = edit(TextFieldValue(text, after[index])) ?: continue
+            val made = edit(index, TextFieldValue(text, after[index])) ?: continue
             val change = TextChange.between(text, made.text)
             for (later in after.indices) {
                 if (later != index && carets.selections[later].min >= carets.selections[index].max) after[later] = change.map(after[later])

@@ -42,4 +42,16 @@ class CodeCaretsTest {
         assertEquals("a\n\nb\n", lines.text)
         assertEquals(listOf(TextRange(2), TextRange(5)), lines.selections)
     }
+
+    @Test
+    fun copyingTakesEachSelectionAndPastesAPieceAtEach() {
+        val two = Carets("ab\ncd\nef", listOf(TextRange(5, 4), TextRange(0, 1)))
+        assertEquals(listOf("a", "d"), CodeCarets.copied(two), "in the text's order")
+        assertEquals(listOf("ab", "ef"), CodeCarets.copied(Carets("ab\ncd\nef", listOf(TextRange(7), TextRange(1)))), "a caret's line")
+        assertEquals("b\nc\nef", CodeCarets.cut(two).text)
+        assertEquals("cd\n", CodeCarets.cut(Carets("ab\ncd\nef", listOf(TextRange(7), TextRange(1)))).text, "a caret's line and its break")
+        val pasted = CodeCarets.pasteEach(two, listOf("X", "Y"))
+        assertEquals("Xb\ncY\nef", pasted?.text)
+        assertEquals(null, CodeCarets.pasteEach(two, listOf("X")))
+    }
 }
