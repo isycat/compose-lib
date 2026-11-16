@@ -40,6 +40,18 @@ class CodeEditingTest {
     }
 
     @Test
+    fun enterStepsInWhereTheLineGoesOnAsKtlintLaysItOut() {
+        // Owner report 492: the editor's indents are ktlint's.
+        assertEquals("val a =\n    |", shown(editing.newLine(at("val a =|"))))
+        assertEquals("    list.map { item ->\n        |", shown(editing.newLine(at("    list.map { item ->|"))))
+        assertEquals("    is A ->\n        |", shown(editing.newLine(at("    is A ->|"))))
+        assertEquals("val b = a &&\n    |", shown(editing.newLine(at("val b = a &&|"))))
+        assertEquals("val c = a +\n    |", shown(editing.newLine(at("val c = a +|"))))
+        assertEquals("// a =\n|", shown(editing.newLine(at("// a =|"))), "not in a comment")
+        assertEquals("i++\n|", shown(editing.newLine(at("i++|"))))
+    }
+
+    @Test
     fun aClosingBraceTypedOnABlankLineLinesUpWithItsOpening() {
         assertEquals("if (a) {\n    b\n}|", shown(editing.type(at("if (a) {\n    b\n    |"), '}')))
         assertEquals("  f(\n    x\n  )|", shown(editing.type(at("  f(\n    x\n      |"), ')')))

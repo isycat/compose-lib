@@ -234,7 +234,18 @@ class CodeEditing(
         return value.copy(selection = TextRange(if (extend) value.selection.start else to, to))
     }
 
-    private fun indentsAfter(before: String): Boolean = before.trimEnd().lastOrNull()?.let { closerOf(it) != null } == true
+    /**
+     * Whether the line goes on, [before] the caret, so the next one steps in an indent, as ktlint lays it out: after an
+     * opening bracket; after `=`, a lambda's or a `when` branch's `->`, and an operator the line ends in, its expression
+     * going on below (owner report 492). Not in a line comment.
+     */
+    private fun indentsAfter(before: String): Boolean {
+        val line = before.trimEnd()
+        if (line.lastOrNull()?.let { closerOf(it) != null } == true) return true
+        val code = line.substringBefore("//")
+        return code.length == line.length && CONTINUES.any { line.endsWith(it) } && !line.endsWith("*/") && !line.endsWith("++") &&
+            !line.endsWith("--")
+    }
 
     /** The indent of the line the bracket a [closing] one typed at [lineFrom] closes is on; one indent less where none is. */
     private fun indentOfOpening(text: String, lineFrom: Int, closing: Char, literals: Literals): String {
@@ -329,3 +340,6 @@ class CodeEditing(
         fun visualColumn(before: String): Int = before.fold(0) { cells, c -> if (c == '\t') (cells / TAB_SIZE + 1) * TAB_SIZE else cells + 1 }
     }
 }
+
+// What a line ends in where its expression goes on to the next.
+private val CONTINUES = listOf("=", "->", "&&", "||", "?:", "+", "-", "*", "/", "%")
