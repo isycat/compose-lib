@@ -41,6 +41,28 @@ object WindowsFileAssociation {
         }
     }
 
+    private val isWindows: Boolean get() = System.getProperty("os.name").orEmpty().startsWith("Windows")
+
+    /**
+     * Whether the registry holds everything [association] needs already, so its files open in the app: for asking the
+     * user before [ensure] changes anything. False off Windows, where there's nothing to ask.
+     */
+    fun isAssociated(association: Association): Boolean = isWindows && stale(association, ::read).isEmpty()
+
+    /**
+     * The entries of [association] that the registry, as [read] gives a value (key under HKCU, value name; null where
+     * there's none), doesn't hold yet or holds otherwise.
+     */
+    fun stale(association: Association, read: (key: String, name: String) -> String?): List<Triple<String, String, String>> =
+        entries(association).filter { (key, name, data) -> read(key, name) != data }
+
+    // A string value under HKCU, or null where there's none.
+    private fun read(key: String, name: String): String? {
+        val root = WinReg.HKEY_CURRENT_USER
+        if (!Advapi32Util.registryKeyExists(root, key) || !Advapi32Util.registryValueExists(root, key, name)) return null
+        return runCatching { Advapi32Util.registryGetStringValue(root, key, name) }.getOrNull()
+    }
+
     /** The registry values [association] needs, as (key under HKCU, value name, data); "" is a key's default value. */
     fun entries(association: Association): List<Triple<String, String, String>> {
         val exe = association.executable.absolutePath
@@ -60,13 +82,9 @@ object WindowsFileAssociation {
      * change. Does nothing (and returns false) off Windows.
      */
     fun ensure(association: Association): Boolean {
-        if (!System.getProperty("os.name").orEmpty().startsWith("Windows")) return false
+        if (!isWindows) return false
         val root = WinReg.HKEY_CURRENT_USER
-        val stale = entries(association).filter { (key, name, data) ->
-            !Advapi32Util.registryKeyExists(root, key) ||
-                !Advapi32Util.registryValueExists(root, key, name) ||
-                runCatching { Advapi32Util.registryGetStringValue(root, key, name) }.getOrNull() != data
-        }
+        val stale = stale(association, ::read)
         if (stale.isEmpty()) return false
         stale.forEach { (key, name, data) ->
             if (!Advapi32Util.registryKeyExists(root, key)) Advapi32Util.registryCreateKey(root, key)
