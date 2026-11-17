@@ -35,22 +35,38 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** One answer of a [SlimDialog]: its [label], whether it is the [primary] one Enter gives, and what it does. */
-data class DialogAnswer(val label: String, val primary: Boolean = false, val onClick: () -> Unit)
+/**
+ * One answer of a [SlimDialog]: its [label], whether it is the [primary] one Enter gives, the place in its label of the
+ * letter that gives it ([letterAt], underlined; none where null), and what it does.
+ */
+data class DialogAnswer(val label: String, val primary: Boolean = false, val letterAt: Int? = null, val onClick: () -> Unit) {
+    /** The letter that gives it, upper case, where it has one. */
+    val letter: Char? get() = letterAt?.let { label.getOrNull(it) }?.uppercaseChar()
+}
 
 /**
  * A slim question over the dimmed window, as moonshine's are rather than Material's: a narrow title bar with [title] and
  * a close button, the [question] in bold, one line of [detail], and compact [answers] at the end, the primary filled.
- * Enter gives the primary answer; Escape, the close button or a click outside [onClose] it.
+ * Enter gives the primary answer, an answer's underlined letter gives it; Escape, the close button or a click outside
+ * [onClose] it.
  */
 @Composable
 fun SlimDialog(
@@ -76,6 +92,8 @@ fun SlimDialog(
                     down && event.key == Key.Escape -> true.also { onClose() }
                     down && (event.key == Key.Enter || event.key == Key.NumPadEnter) ->
                         answers.firstOrNull { it.primary }?.also { it.onClick() } != null
+                    down && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed ->
+                        letterOf(event)?.let { letter -> answers.firstOrNull { it.letter == letter } }?.also { it.onClick() } != null
                     else -> false
                 }
             }
@@ -130,7 +148,17 @@ private fun SlimButton(answer: DialogAnswer) {
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(answer.label, style = MaterialTheme.typography.labelLarge, color = if (answer.primary) colors.onPrimary else colors.onSurface)
+        val label = buildAnnotatedString {
+            val at = answer.letterAt?.takeIf { it in answer.label.indices }
+            if (at == null) {
+                append(answer.label)
+            } else {
+                append(answer.label.substring(0, at))
+                withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(answer.label[at]) }
+                append(answer.label.substring(at + 1))
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (answer.primary) colors.onPrimary else colors.onSurface)
     }
 }
 
@@ -140,3 +168,12 @@ private val BUTTON_HEIGHT = 30.dp
 private const val SCRIM = 0.4f
 private const val HOVER = 0.08f
 private const val HOVERED_PRIMARY = 0.88f
+
+/** The letter [event]'s key types, upper case, where it types one: in the user's layout where it says, else A to Z by key. */
+private fun letterOf(event: KeyEvent): Char? =
+    event.utf16CodePoint.takeIf { it > 0 }?.toChar()?.takeIf { it.isLetter() }?.uppercaseChar() ?: LETTER_KEYS[event.key]
+
+private val LETTER_KEYS: Map<Key, Char> = listOf(
+    Key.A, Key.B, Key.C, Key.D, Key.E, Key.F, Key.G, Key.H, Key.I, Key.J, Key.K, Key.L, Key.M,
+    Key.N, Key.O, Key.P, Key.Q, Key.R, Key.S, Key.T, Key.U, Key.V, Key.W, Key.X, Key.Y, Key.Z,
+).zip('A'..'Z').toMap()
