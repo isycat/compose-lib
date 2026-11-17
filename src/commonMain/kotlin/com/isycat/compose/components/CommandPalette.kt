@@ -198,7 +198,8 @@ fun CommandPalette(
         item.run()
     }
     LaunchedEffect(state.chosen, results) {
-        // Keep the chosen row in view as the keys move through the list.
+        // Keep the chosen row in view as the keys move through the list, in a frame of its own.
+        inFrameOfItsOwn()
         val visible = list.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) return@LaunchedEffect
         val chosen = state.chosen

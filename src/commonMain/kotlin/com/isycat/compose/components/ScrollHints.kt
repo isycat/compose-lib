@@ -186,6 +186,7 @@ fun Modifier.bringIntoViewClearOfHints(key: Any?): Modifier {
     val margin = with(LocalDensity.current) { ScrollHintDefaults.FadeHeight.toPx() }
     LaunchedEffect(key, size) {
         if (size != IntSize.Zero) {
+            inFrameOfItsOwn()
             requester.bringIntoView(Rect(0f, -margin, size.width.toFloat(), size.height + margin))
         }
     }
