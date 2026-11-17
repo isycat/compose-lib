@@ -34,6 +34,16 @@ class CommandPaletteTest {
     }
 
     @Test
+    fun anItemIsFoundByAKeywordHoldingTheQueryWholeBelowATitleMatchingAsWell() {
+        val moveFace = PaletteItem("Move face", keywords = listOf("Push pull", "Offset face")) {}
+        val pushing = PaletteItem("Push to remote") {}
+        val found = paletteSearch(listOf(moveFace, pushing) + items, "push")
+        assertEquals(listOf("Push to remote", "Move face"), found.map { it.title }, "its title first, then by a keyword")
+        assertEquals(listOf("Move face"), paletteSearch(listOf(moveFace) + items, "offset").map { it.title })
+        assertEquals(emptyList(), paletteSearch(listOf(moveFace), "pspl"), "a keyword's letters scattered find nothing")
+    }
+
+    @Test
     fun everyLetterThePaletteWritesItselfIsInTheBundledFont() {
         // The browser has no fonts but the ones bundled: a glyph missing from Roboto draws as an empty box there.
         val font = com.isycat.compose.ui.AwtFonts.roboto(12f)

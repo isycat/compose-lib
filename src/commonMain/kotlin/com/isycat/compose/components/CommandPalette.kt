@@ -65,7 +65,9 @@ import androidx.compose.ui.window.PopupProperties
 
 /**
  * One thing a [CommandPalette] finds, and what choosing it does. [detail] says where it lives (a command's menu, an
- * item's folder), [kind] what it is ("Command"), [verb] what Enter does to it ("runs", "opens", "selects").
+ * item's folder), [kind] what it is ("Command"), [verb] what Enter does to it ("runs", "opens", "selects"). [keywords]
+ * are other names it is found by, as other apps call it ("push pull" for a face move): a query typed whole within one
+ * finds it, ranked below items whose own title matches as well.
  */
 class PaletteItem(
     val title: String,
@@ -75,8 +77,19 @@ class PaletteItem(
     val shortcut: String? = null,
     val enabled: Boolean = true,
     val verb: String = "runs",
+    val keywords: List<String> = emptyList(),
     val run: () -> Unit,
 )
+
+/**
+ * How well [query] matches [item]: by its title as [matchScore] says, or, where a keyword holds the query whole, by that
+ * keyword, a little below a title matching as well; null when neither does.
+ */
+fun itemScore(query: String, item: PaletteItem): Int? {
+    val q = query.trim().lowercase()
+    val byKeyword = item.keywords.filter { q in it.lowercase() }.mapNotNull { matchScore(q, it) }.maxOrNull()?.minus(KEYWORD)
+    return listOfNotNull(matchScore(query, item.title), byKeyword).maxOrNull()
+}
 
 /**
  * How well [query] matches [text], higher better, or null when it does not. Every letter of the query must appear in
@@ -134,7 +147,7 @@ fun matchPositions(query: String, text: String): List<Int> {
 fun paletteSearch(items: List<PaletteItem>, query: String): List<PaletteItem> {
     if (query.isBlank()) return items
     return items.withIndex()
-        .mapNotNull { (index, item) -> matchScore(query, item.title)?.let { Triple(item, it, index) } }
+        .mapNotNull { (index, item) -> itemScore(query, item)?.let { Triple(item, it, index) } }
         .sortedWith(compareByDescending<Triple<PaletteItem, Int, Int>> { it.second }.thenBy { it.third })
         .map { it.first }
 }
@@ -343,5 +356,8 @@ private const val DISABLED = 0.38f
 private const val RUN = 1000
 private const val START = 400
 private const val WORD = 200
+
+// How far a match by a keyword ranks below the same match by a title.
+private const val KEYWORD = 100
 private const val CONSECUTIVE = 8
 private const val WORD_LETTER = 6
