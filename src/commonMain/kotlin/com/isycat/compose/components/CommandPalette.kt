@@ -237,11 +237,10 @@ fun CommandPalette(
                     Key.Enter, Key.NumPadEnter -> true.also { state.choice?.let(::run) }
                     else -> false
                 }
-            },
+            }.outerShadow(12.dp, MaterialTheme.shapes.medium),
             shape = MaterialTheme.shapes.medium,
             color = colors.surfaceContainerHigh,
             border = BorderStroke(1.dp, colors.outlineVariant),
-            shadowElevation = 12.dp,
         ) {
             Column {
                 SearchField(

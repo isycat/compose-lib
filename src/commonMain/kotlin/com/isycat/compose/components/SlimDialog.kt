@@ -103,8 +103,8 @@ fun SlimDialog(
         Surface(
             shape = MaterialTheme.shapes.medium,
             color = surface,
-            shadowElevation = 8.dp,
-            modifier = modifier.widthIn(max = WIDTH).pointerInput(Unit) { detectTapGestures { } },
+            modifier = modifier.widthIn(max = WIDTH).pointerInput(Unit) { detectTapGestures { } }
+                .outerShadow(8.dp, MaterialTheme.shapes.medium),
         ) {
             Column {
                 Row(Modifier.fillMaxWidth().height(TITLE_HEIGHT).padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {

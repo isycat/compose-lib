@@ -1,5 +1,6 @@
 package com.isycat.compose.ui
 
+import com.isycat.compose.components.outerShadow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -329,7 +330,7 @@ object TitleBarDefaults {
     fun Tooltip(text: String, colors: TitleBarColors = colors(), typography: TitleBarTypography = typography()) {
         val shape = RoundedCornerShape(4.dp)
         Box(
-            Modifier.shadow(6.dp, shape).background(colors.tooltip, shape).border(1.dp, colors.tooltipBorder, shape)
+            Modifier.outerShadow(6.dp, shape).background(colors.tooltip, shape).border(1.dp, colors.tooltipBorder, shape)
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) { Label(text, typography.small, colors.tooltipText) }
     }
