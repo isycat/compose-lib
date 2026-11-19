@@ -81,4 +81,22 @@ class CommandPaletteTest {
         waitForIdle()
         assertTrue(!open, "Escape closes the palette")
     }
+
+    @Test
+    fun withNothingTypedTheQuickItemsStandFirstNumberedAndANumberRunsOne() = runSkikoComposeUiTest {
+        var open by mutableStateOf(true)
+        val quick = (1..11).map { n -> PaletteItem("Quick $n") { ran += "Quick $n" } }
+        setContent { MaterialTheme { if (open) CommandPalette(items, onDismiss = { open = false }, quick = quick) } }
+        onNodeWithTag("$QUICK_NUMBER:1", useUnmergedTree = true).assertExists()
+        onNodeWithTag("$QUICK_NUMBER:0", useUnmergedTree = true).assertExists()
+        onNodeWithTag(COMMAND_PALETTE_FIELD).performKeyInput { pressKey(Key.Zero) }
+        assertEquals(listOf("Quick 10"), ran, "0 runs the tenth")
+        assertTrue(!open, "and closes the palette")
+        open = true
+        waitForIdle()
+        onNodeWithTag(COMMAND_PALETTE_FIELD).performTextInput("fr")
+        onNodeWithTag(COMMAND_PALETTE_FIELD).performKeyInput { pressKey(Key.Two) }
+        assertEquals(listOf("Quick 10"), ran, "typing, a number is typed, not run")
+        onNodeWithTag("$QUICK_NUMBER:1", useUnmergedTree = true).assertDoesNotExist()
+    }
 }

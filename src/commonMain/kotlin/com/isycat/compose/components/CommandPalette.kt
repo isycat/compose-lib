@@ -11,13 +11,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,22 +49,18 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 
@@ -152,15 +153,24 @@ fun paletteSearch(items: List<PaletteItem>, query: String): List<PaletteItem> {
         .map { it.first }
 }
 
-/** A [CommandPalette]'s query and the result chosen among what it finds: Up and Down move the choice, Enter runs it. */
-class CommandPaletteState(private val items: List<PaletteItem>, initialQuery: String = "") {
+/**
+ * A [CommandPalette]'s query and the result chosen among what it finds: Up and Down move the choice, Enter runs it. With
+ * nothing typed, the [quick] items stand first, numbered.
+ */
+class CommandPaletteState(private val items: List<PaletteItem>, initialQuery: String = "", val quick: List<PaletteItem> = emptyList()) {
     var query by mutableStateOf(initialQuery)
         private set
 
     var chosen by mutableIntStateOf(0)
         private set
 
-    val results: List<PaletteItem> by derivedStateOf { paletteSearch(items, query) }
+    val results: List<PaletteItem> by derivedStateOf { if (query.isBlank()) quick + items else paletteSearch(items, query) }
+
+    /** The number the result at [index] is run by, 1 to 9 then 0, while nothing is typed and it is a quick one; else null. */
+    fun numberOf(index: Int): Int? = if (query.isBlank() && index < minOf(quick.size, QUICK_KEYS)) (index + 1) % QUICK_KEYS else null
+
+    /** The quick item number [digit] runs, 1 to 9 then 0, while nothing is typed; null where there is none. */
+    fun quickAt(digit: Int): PaletteItem? = if (query.isBlank()) quick.getOrNull((digit + QUICK_KEYS - 1) % QUICK_KEYS) else null
 
     val choice: PaletteItem? get() = results.getOrNull(chosen)
 
@@ -199,8 +209,9 @@ fun CommandPalette(
     width: Dp = 600.dp,
     top: Dp = 80.dp,
     mostRows: Int = 14,
+    quick: List<PaletteItem> = emptyList(),
 ) {
-    val state = remember(items) { CommandPaletteState(items) }
+    val state = remember(items, quick) { CommandPaletteState(items, quick = quick) }
     val dismiss by rememberUpdatedState(onDismiss)
     val results = state.results
     val list = rememberLazyListState()
@@ -235,7 +246,8 @@ fun CommandPalette(
                     Key.DirectionDown -> true.also { state.move(1) }
                     Key.DirectionUp -> true.also { state.move(-1) }
                     Key.Enter, Key.NumPadEnter -> true.also { state.choice?.let(::run) }
-                    else -> false
+                    // While nothing is typed, a number runs the quick item it numbers, as JetBrains' Actions do.
+                    else -> digitOf(event.key)?.let(state::quickAt)?.let { true.also { _ -> run(it) } } ?: false
                 }
             }.outerShadow(12.dp, MaterialTheme.shapes.medium),
             shape = MaterialTheme.shapes.medium,
@@ -264,7 +276,14 @@ fun CommandPalette(
                     } else {
                         LazyColumn(Modifier.fillMaxWidth().padding(vertical = LIST_PADDING), state = list) {
                             itemsIndexed(results) { index, item ->
-                                PaletteRow(item, state.query, index == state.chosen, onPoint = { state.choose(index) }) { run(item) }
+                                // The quick items are set off from the rest by a line under the last of them.
+                                val last = state.query.isBlank() && index == state.quick.lastIndex && index < results.lastIndex
+                                Column {
+                                    PaletteRow(item, state.query, index == state.chosen, state.numberOf(index), onPoint = { state.choose(index) }) {
+                                        run(item)
+                                    }
+                                    if (last) HorizontalDivider(Modifier.padding(horizontal = 12.dp, vertical = 2.dp), color = colors.outlineVariant)
+                                }
                             }
                         }
                     }
@@ -305,7 +324,7 @@ private const val UP_ARROW = "up"
 private const val DOWN_ARROW = "down"
 
 @Composable
-private fun PaletteRow(item: PaletteItem, query: String, chosen: Boolean, onPoint: () -> Unit, onClick: () -> Unit) {
+private fun PaletteRow(item: PaletteItem, query: String, chosen: Boolean, number: Int?, onPoint: () -> Unit, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
@@ -318,6 +337,17 @@ private fun PaletteRow(item: PaletteItem, query: String, chosen: Boolean, onPoin
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // A quick item's number, underlined, as the key that runs it.
+        Box(Modifier.width(20.dp)) {
+            if (number != null) {
+                Text(
+                    "$number",
+                    Modifier.testTag("$QUICK_NUMBER:$number"),
+                    style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.Underline),
+                    color = colors.onSurfaceVariant,
+                )
+            }
+        }
         Box(Modifier.width(28.dp)) {
             if (item.icon != null) {
                 val tint = when {
@@ -347,6 +377,28 @@ private fun PaletteRow(item: PaletteItem, query: String, chosen: Boolean, onPoin
         Text(item.kind, Modifier.width(76.dp), style = MaterialTheme.typography.bodySmall, color = quiet, maxLines = 1)
     }
 }
+
+/** The digit [key] is, on the main keys or the number pad; null where it is none. */
+private fun digitOf(key: Key): Int? = DIGITS.indexOfFirst { key in it }.takeIf { it >= 0 }
+
+private val DIGITS = listOf(
+    setOf(Key.Zero, Key.NumPad0),
+    setOf(Key.One, Key.NumPad1),
+    setOf(Key.Two, Key.NumPad2),
+    setOf(Key.Three, Key.NumPad3),
+    setOf(Key.Four, Key.NumPad4),
+    setOf(Key.Five, Key.NumPad5),
+    setOf(Key.Six, Key.NumPad6),
+    setOf(Key.Seven, Key.NumPad7),
+    setOf(Key.Eight, Key.NumPad8),
+    setOf(Key.Nine, Key.NumPad9),
+)
+
+/** Marks a quick item's number in the palette: this, a colon and the number. */
+const val QUICK_NUMBER = "palette-quick-number"
+
+// How many quick items have keys: 1 to 9, then 0.
+private const val QUICK_KEYS = 10
 
 private val ROW = 36.dp
 private val LIST_PADDING = 4.dp
