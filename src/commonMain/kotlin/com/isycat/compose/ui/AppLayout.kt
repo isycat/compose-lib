@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.isycat.compose.components.HoverTooltip
 
@@ -156,8 +157,16 @@ fun AppLayout(
     }
 }
 
-private val RailWidth = 72.dp
-private val RailItemHeight = 64.dp
+private val RailWidth = 80.dp
+
+/** Every rail entry is this tall, room for an icon over a title of two lines, so the entries are evenly spaced. */
+private val RailItemHeight = 72.dp
+
+/** The space each side of a rail entry's title, so a title never touches the rail's edges. */
+private val RailItemInset = 6.dp
+
+/** A rail entry's title: whole, never cut short, wrapping onto a second line when one is too narrow for it. */
+const val RAIL_TITLE_LINES = 2
 
 /**
  * The tabs as a vertical rail, after any [buttons]: each one an icon over its title, the selected one in [accentColor]
@@ -240,11 +249,25 @@ private fun RailItem(
     ) {
         if (selected) RailIndicator(accent, glow = glow, Modifier.align(Alignment.CenterEnd))
         CompositionLocalProvider(LocalContentColor provides color) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                Modifier.padding(horizontal = RailItemInset),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 val glowing = selected && glow
                 item.icon?.let { icon -> if (glowing) GlowWhenSelected(true) { icon() } else icon() }
                 item.title?.let { title ->
-                    val text = @Composable { Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                    // As wide as the entry, so the title is centred in it whether it takes one line or two.
+                    val text = @Composable {
+                        Text(
+                            title,
+                            Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = RAIL_TITLE_LINES,
+                            softWrap = true
+                        )
+                    }
                     if (glowing) GlowWhenSelected(true, text) else text()
                 }
             }
