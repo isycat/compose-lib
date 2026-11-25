@@ -99,6 +99,7 @@ class FileTypesOfferTest {
             next.look()
             assertFalse(next.asking)
             next.offering(true)
+            assertFalse(next.dontAskAgain, "turned back on, the box is not still ticked")
             assertTrue(kept)
             next.look()
             assertTrue(next.asking)

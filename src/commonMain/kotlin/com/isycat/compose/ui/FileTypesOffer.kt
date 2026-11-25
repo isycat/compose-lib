@@ -79,6 +79,7 @@ class FileTypesOffer(
         keepOffering(offer)
         if (offer) {
             answered = false
+            dontAskAgain = false
         } else {
             asking = false
             failure = null
